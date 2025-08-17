@@ -3,7 +3,7 @@ const T = {
   de:{title:"Vokabeltrainer",tools:"Werkzeuge",deck:"Deck:",lang:"UI-Sprache:",
       addTitle:"Neue Karte hinzufügen",addBtn:"Karte hinzufügen",importTitle:"CSV Import",
       exportBtn:"Exportieren",stats:"Statistik",fresh:"+7",noCards:"Keine Karten",
-      toTest:"→ Prüfen",toLearn:"→ Lernen",legend:{
+      modeLearn:"Lernen", modeTest:"Prüfen", legend:{
         b1:"Box 1", b2:"Box 2", b3:"Box 3", b4:"Box 4", b5:"Box 5", reserve:"Reserve", learned:"Gelernt"
       },
       wrong:"❌ Falsch", right:"✅ Richtig",
@@ -13,7 +13,7 @@ const T = {
   en:{title:"Vocabulary Trainer",tools:"Tools",deck:"Deck:",lang:"UI Language:",
       addTitle:"Add New Card",addBtn:"Add Card",importTitle:"CSV Import",
       exportBtn:"Export",stats:"Statistics",fresh:"+7",noCards:"No cards",
-      toTest:"→ Test",toLearn:"→ Learn",legend:{
+      modeLearn:"Learn", modeTest:"Test", legend:{
         b1:"Box 1", b2:"Box 2", b3:"Box 3", b4:"Box 4", b5:"Box 5", reserve:"Reserve", learned:"Learned"
       },
       wrong:"❌ Wrong", right:"✅ Right",
@@ -23,7 +23,7 @@ const T = {
   sv:{title:"Ordkortstränare",tools:"Verktyg",deck:"Kortlek:",lang:"UI-språk:",
       addTitle:"Lägg till nytt kort",addBtn:"Lägg till kort",importTitle:"CSV-import",
       exportBtn:"Exportera",stats:"Statistik",fresh:"+7",noCards:"Inga kort",
-      toTest:"→ Testa",toLearn:"→ Lära",legend:{
+      modeLearn:"Lära", modeTest:"Testa", legend:{
         b1:"Box 1", b2:"Box 2", b3:"Box 3", b4:"Box 4", b5:"Box 5", reserve:"Reserv", learned:"Inlärd"
       },
       wrong:"❌ Fel", right:"✅ Rätt",
@@ -33,7 +33,7 @@ const T = {
   es:{title:"Entrenador de Vocabulario",tools:"Herramientas",deck:"Baraja:",lang:"Idioma de UI:",
       addTitle:"Añadir tarjeta",addBtn:"Añadir",importTitle:"Importar CSV",
       exportBtn:"Exportar",stats:"Estadísticas",fresh:"+7",noCards:"Sin tarjetas",
-      toTest:"→ Probar",toLearn:"→ Aprender",legend:{
+      modeLearn:"Aprender", modeTest:"Probar", legend:{
         b1:"Caja 1", b2:"Caja 2", b3:"Caja 3", b4:"Caja 4", b5:"Caja 5", reserve:"Reserva", learned:"Aprendidas"
       },
       wrong:"❌ Incorrecto", right:"✅ Correcto",
@@ -52,6 +52,7 @@ if(decks.length===0){
 }
 let currentDeckId = localStorage.getItem("leitnerCurrentDeck") || decks[0].id;
 let direction="a2b", mode="lernen", currentTestBox=1, learnIndex=0;
+let testRevealed=false; // <— NEU: steuert Sichtbarkeit der Richtig/Falsch-Buttons
 const batchSizeFresh=7;
 
 function deckKey(k){ return `${k}_${currentDeckId}`; }
@@ -76,6 +77,7 @@ const deckSelect=$("deckSelect"), sideALabelInput=$("sideALabelInput"), sideBLab
       csvFile=$("csvFile");
 
 const landInfoText=$("landInfoText"), freshBtn=$("freshBtn"), landModeToggle=$("landModeToggle");
+const landHud=$("landHud"), landRight=$("landRight"), landWrong=$("landWrong"), landActions=$("landActions");
 
 const learnPair=$("learnPair"), tileEs=$("tileEs"), tileDe=$("tileDe");
 const testPair=$("testPair"), testLeft=$("testLeft"), testRight=$("testRight");
@@ -90,6 +92,9 @@ const editPanel=$("editPanel"), editBtn=$("editBtn"), editA=$("editA"), editB=$(
 const pointsChip=$("pointsChip"), levelChip=$("levelChip"), streakChip=$("streakChip");
 
 const deckAddBtn=$("deckAddBtn"), deckRenameBtn=$("deckRenameBtn"), deckDeleteBtn=$("deckDeleteBtn");
+
+/* Bottom Sheet */
+const sheet=$("sheet"), sheetHandle=$("sheetHandle"), boxChartSheet=$("boxChartSheet");
 
 /* Verwalten */
 const deleteBtn=$("deleteBtn"), resetProgressBtn=$("resetProgressBtn"), resetAllBtn=$("resetAllBtn");
@@ -181,7 +186,7 @@ function applyTranslations(){
   $("addCardBtn").textContent=t.addBtn;
   freshBtn.textContent=t.fresh; btnWrong.textContent=t.wrong; btnRight.textContent=t.right;
   toggleDirectionBtn.textContent=t.dirBtn;
-  updateLegend(); updateTopModeText(); updateLandInfo();
+  updateLegend(); updateModeButtons(); updateLandInfo();
 }
 
 /***** Labels / Richtung ************************************************/
@@ -223,7 +228,6 @@ function updateGamification(){ pointsChip.textContent=points; levelChip.textCont
 
 /***** Diagramme ********************************************************/
 const PIE_COLORS = ["#60a5fa","#3b82f6","#1d4ed8","#a78bfa","#7c3aed","#22c55e","#f59e0b"]; 
-// B1,B2,B3,B4,B5,Reserve,Gelernt
 
 function updateLegend(){
   const L=T[currentLang].legend;
@@ -238,8 +242,9 @@ function updateLegend(){
   `;
 }
 
-function buildBoxChart(){
-  boxChart.innerHTML="";
+function buildBoxChart(targetEl){
+  const el = targetEl || boxChart;
+  el.innerHTML="";
   const counts=[1,2,3,4,5].map(b=>activeCards.filter(c=>c.box===b).length);
   const max=Math.max(1,...counts);
   counts.forEach((cnt,idx)=>{
@@ -250,9 +255,10 @@ function buildBoxChart(){
     bar.addEventListener("click",()=>{
       currentTestBox=idx+1;
       mode=(currentTestBox===1)?"lernen":"prüfen";
+      closeSheet();
       render(); refreshCountsUI();
     });
-    boxChart.appendChild(bar);
+    el.appendChild(bar);
   });
 }
 
@@ -282,14 +288,16 @@ function drawPieChart(){
 }
 
 function updateLandInfo(){
-  const t=T[currentLang];
   const count=activeCards.filter(c=>c.box===currentTestBox).length;
   landInfoText.textContent=`B${currentTestBox}: ${count}`;
-  landModeToggle.textContent=(mode==="lernen")?t.toTest:t.toLearn;
-  const landscape=matchMedia("(orientation:landscape)").matches;
-  freshBtn.style.display=(currentTestBox===1 && landscape && !drawer.classList.contains("open") && matchMedia("(pointer:coarse)").matches)?"block":"none";
+  updateModeButtons();
 }
-function refreshCountsUI(){ buildBoxChart(); drawPieChart(); updateLandInfo(); }
+function refreshCountsUI(){
+  buildBoxChart(); drawPieChart(); updateLandInfo();
+  if (matchMedia("(orientation:landscape)").matches && matchMedia("(pointer:coarse)").matches){
+    buildBoxChart(boxChartSheet);
+  }
+}
 
 /***** Schriftgröße *****************************************************/
 function fitTileText(tile, minPx=16){
@@ -302,65 +310,91 @@ function fitBothTiles(){ fitTileText(tileEs); fitTileText(tileDe); }
 
 /***** Render + aktueller Karte-Pointer *********************************/
 let currentCard=null;
-function render(){
+function updateModeButtons(){
   const t=T[currentLang];
+  $("toggleModeBtn").textContent = (mode==="lernen") ? t.modeLearn : t.modeTest;
+  landModeToggle.textContent     = (mode==="lernen") ? t.modeLearn : t.modeTest;
+}
+function render(){
   directionBadge.textContent=dirText();
+  testRevealed=false;                       // bei jedem Render im Prüfmodus erst mal „verdeckt“
+
   if(mode==="lernen"){
-    learnPair.hidden=false; testPair.hidden=true; testActions.hidden=true;
+    learnPair.hidden=false; testPair.hidden=true;
+    testActions.hidden=true; landActions.hidden=true;
+
     const b1=activeCards.filter(c=>c.box===1);
-    if(!b1.length){ tileEs.textContent=t.noCards; tileDe.textContent=""; currentCard=null; fitBothTiles(); return; }
+    if(!b1.length){ tileEs.textContent=T[currentLang].noCards; tileDe.textContent=""; currentCard=null; fitBothTiles(); return; }
     const idx=((learnIndex<0?0:learnIndex) % b1.length);
     currentCard=b1[idx];
     tileEs.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     tileDe.textContent=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
     fitBothTiles();
   }else{
-    learnPair.hidden=true; testPair.hidden=false; testActions.hidden=true;
-    testPair.classList.remove("out-up","out-down"); // reset class
+    learnPair.hidden=true; testPair.hidden=false;
+
+    testActions.hidden=true; landActions.hidden=true;   // Buttons erst nach Reveal sichtbar
+    testPair.classList.remove("out-up","out-down","in-fade");
+
     const bx=activeCards.filter(c=>c.box===currentTestBox);
-    if(!bx.length){ testLeft.textContent=t.noCards; testRight.textContent=""; currentCard=null; fitTileText(testLeft); fitTileText(testRight); return; }
+    if(!bx.length){ testLeft.textContent=T[currentLang].noCards; testRight.textContent=""; currentCard=null; fitTileText(testLeft); fitTileText(testRight); return; }
     currentCard = bx[Math.floor(Math.random()*bx.length)];
     testLeft.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     testRight.textContent=""; testRight.classList.add("muted");
     testPair.classList.add("in-fade");
     fitTileText(testLeft); fitTileText(testRight);
   }
-  updateTopModeText(); updateGamification();
-}
-function updateTopModeText(){
-  const t=T[currentLang];
-  $("toggleModeBtn").textContent=(mode==="lernen")?t.toTest:t.toLearn;
+  updateModeButtons();
+  updateGamification();
+  updateLandInfo();
 }
 
 /***** Prüf-Flow + Animation ********************************************/
-let actionLock=false;              // globales Lock (Debounce)
-const lock = (ms=260)=>{ actionLock=true; setTimeout(()=>actionLock=false, ms); };
-
-testPair.addEventListener("click", ()=>{
-  if(mode!=="prüfen" || !currentCard || actionLock) return;
-  const ans=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
-  if(testRight.textContent===""){
-    testRight.textContent=ans; testRight.classList.remove("muted"); testActions.hidden=false; fitTileText(testRight);
-    lock(220); // kurze Sperre, damit kein Doppelklick gleich „richtig“/„falsch“ auslöst
-  }
-});
-
+let actionLock=false; // Debounce
+let lockTimer=null, animFallbackTimer=null;
+function lock(ms=260){
+  actionLock=true;
+  clearTimeout(lockTimer);
+  lockTimer=setTimeout(()=>{ actionLock=false; }, ms+40);
+}
 function animateAndAdvance(className, after){
   if(actionLock) return;
   actionLock=true;
   testPair.classList.remove("in-fade");
   testPair.classList.add("test-anim", className);
-  const onEnd = ()=>{
-    testPair.removeEventListener("animationend", onEnd);
+
+  const cleanup=()=>{
     testPair.classList.remove("test-anim", className);
+    clearTimeout(animFallbackTimer);
     actionLock=false;
-    after(); // Fortschritt anwenden & nächste Karte rendern
+    after();
   };
-  testPair.addEventListener("animationend", onEnd, { once:true });
+
+  testPair.addEventListener("animationend", cleanup, { once:true });
+  animFallbackTimer=setTimeout(()=>cleanup(), 320);
 }
 
-btnRight.addEventListener("click", ()=>{
-  if(!currentCard || actionLock) return;
+function revealAnswer(){
+  if(mode!=="prüfen" || !currentCard || actionLock || testRevealed) return;
+  const ans=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
+  testRight.textContent=ans; testRight.classList.remove("muted");
+  testActions.hidden=false; landActions.hidden=false;     // <-- Buttons jetzt zeigen
+  testRevealed=true;
+  fitTileText(testRight);
+  lock(220);
+}
+
+testPair.addEventListener("click", revealAnswer);
+
+// Buttons (Portrait + Desktop)
+btnRight.addEventListener("click", ()=> handleRight());
+btnWrong.addEventListener("click", ()=> handleWrong());
+// Landscape HUD Buttons
+landRight.addEventListener("click", ()=> handleRight());
+landWrong.addEventListener("click", ()=> handleWrong());
+
+function handleRight(){
+  if(mode!=="prüfen" || !currentCard || !testRevealed) return; // nur nach Reveal
   animateAndAdvance("out-up", ()=>{
     const now=new Date().toISOString();
     if(currentCard.box>=5){
@@ -372,10 +406,9 @@ btnRight.addEventListener("click", ()=>{
     }
     saveData(); render(); refreshCountsUI();
   });
-});
-
-btnWrong.addEventListener("click", ()=>{
-  if(!currentCard || actionLock) return;
+}
+function handleWrong(){
+  if(mode!=="prüfen" || !currentCard || !testRevealed) return; // nur nach Reveal
   animateAndAdvance("out-down", ()=>{
     currentCard.box=Math.max(1,currentCard.box-1);
     currentCard.wrong=(currentCard.wrong||0)+1;
@@ -383,34 +416,57 @@ btnWrong.addEventListener("click", ()=>{
     markActivity(0);
     saveData(); render(); refreshCountsUI();
   });
-});
+}
 
-/***** Lernmodus – Swipe mit Debounce **********************************/
+/***** Lernmodus – Swipe (links/rechts) *********************************/
 (function(){
   let startX=0,startY=0,tracking=false; const TH=40, area=learnPair;
   function onStart(e){ const t=e.touches?e.touches[0]:e; startX=t.clientX; startY=t.clientY; tracking=true; }
   function onEnd(e){
     if(!tracking) return; tracking=false;
-    if(actionLock) return;                    // Debounce
+    if(actionLock || mode!=="lernen") return;
     const t=e.changedTouches?e.changedTouches[0]:e;
     const dx=t.clientX-startX, dy=t.clientY-startY; if(Math.abs(dy)>60) return;
     if(dx<-TH){ learnIndex++; }
     else if(dx>TH){ learnIndex=Math.max(0,learnIndex-1); }
-    else{ learnIndex++; }                     // Tap
-    markActivity(1);
-    lock(220);                                // pro Geste max. 1 Schritt
-    render();
+    else{ learnIndex++; }
+    markActivity(1); lock(220); render();
   }
   ["touchstart","mousedown"].forEach(ev=>area.addEventListener(ev,onStart,{passive:true}));
   ["touchend","mouseup","mouseleave"].forEach(ev=>area.addEventListener(ev,onEnd));
 })();
 
-// Drawer
-drawerToggle.addEventListener("click",()=>{ drawer.classList.add("open"); updateLandInfo(); drawer.setAttribute("aria-hidden","false"); });
-drawerToggleTop.addEventListener("click",()=>{ drawer.classList.add("open"); updateLandInfo(); drawer.setAttribute("aria-hidden","false"); });
-drawerClose.addEventListener("click",()=>{ drawer.classList.remove("open"); updateLandInfo(); drawer.setAttribute("aria-hidden","true"); });
+/***** Sheet (Landscape) ************************************************/
+function openSheet(){ sheet.classList.add("open"); sheet.setAttribute("aria-hidden","false"); }
+function closeSheet(){ sheet.classList.remove("open"); sheet.setAttribute("aria-hidden","true"); }
 
-// Labels speichern
+sheetHandle.addEventListener("click", ()=>{
+  if(sheet.classList.contains("open")) closeSheet(); else openSheet();
+});
+
+// Swipe-Up / Down für Sheet
+(function(){
+  let startY=0, tracking=false; const TH=30;
+  function onStart(e){ const t=e.touches?e.touches[0]:e; startY=t.clientY; tracking=true; }
+  function onEnd(e){
+    if(!tracking) return; tracking=false;
+    const t=e.changedTouches?e.changedTouches[0]:e;
+    const dy=t.clientY-startY;
+    if(dy<-TH) openSheet();
+    if(dy> TH) closeSheet();
+  }
+  ["touchstart","mousedown"].forEach(ev=>sheet.addEventListener(ev,onStart,{passive:true}));
+  ["touchend","mouseup","mouseleave"].forEach(ev=>sheet.addEventListener(ev,onEnd));
+  ["touchstart","mousedown"].forEach(ev=>sheetHandle.addEventListener(ev,onStart,{passive:true}));
+  ["touchend","mouseup","mouseleave"].forEach(ev=>sheetHandle.addEventListener(ev,onEnd));
+})();
+
+/***** Drawer ***********************************************************/
+drawerToggle.addEventListener("click",()=>{ drawer.classList.add("open"); drawer.setAttribute("aria-hidden","false"); });
+drawerToggleTop.addEventListener("click",()=>{ drawer.classList.add("open"); drawer.setAttribute("aria-hidden","false"); });
+drawerClose.addEventListener("click",()=>{ drawer.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); });
+
+/***** Labels speichern *************************************************/
 saveLabelsBtn.addEventListener("click", ()=>{
   const d=currentDeck(); if(!d) return;
   d.sideALabel=sideALabelInput.value.trim()||"A";
@@ -418,13 +474,13 @@ saveLabelsBtn.addEventListener("click", ()=>{
   saveData(); applyLabelInputs(); render(); refreshCountsUI();
 });
 
-// Richtung wechseln
+/***** Richtung wechseln ************************************************/
 toggleDirectionBtn.addEventListener("click", ()=>{ direction=(direction==="a2b")?"b2a":"a2b"; render(); });
 
-// +7
+/***** +7 (im Sheet) ****************************************************/
 freshBtn.addEventListener("click", ()=>{
-  if(actionLock) return;
   const take=Math.min(batchSizeFresh,reserveCards.length);
+  if(take<=0){ alert("Keine Karten in der Reserve."); return; }
   const add=reserveCards.splice(0,take).map(c=>({...c,box:1,introduced:false}));
   activeCards.push(...add);
   mode="lernen";
@@ -433,7 +489,15 @@ freshBtn.addEventListener("click", ()=>{
   markActivity(2); saveData(); render(); refreshCountsUI();
 });
 
-// Neue Karte
+/***** Mode Toggle (Portrait & Landscape-Sheet) *************************/
+function toggleMode(){
+  mode=(mode==="lernen")?"prüfen":"lernen";
+  render(); refreshCountsUI();
+}
+$("toggleModeBtn").addEventListener("click", toggleMode);
+landModeToggle.addEventListener("click", ()=>{ toggleMode(); closeSheet(); });
+
+/***** Neue Karte *******************************************************/
 addCardBtn.addEventListener("click", ()=>{
   const A=inputSideA.value.trim(), B=inputSideB.value.trim();
   if(!A||!B) return;
@@ -442,7 +506,7 @@ addCardBtn.addEventListener("click", ()=>{
   saveData(); render(); refreshCountsUI();
 });
 
-// CSV Import
+/***** CSV Import *******************************************************/
 csvFile.addEventListener("change",(ev)=>{
   const file=ev.target.files?.[0]; if(!file) return;
   const rdr=new FileReader();
@@ -468,14 +532,14 @@ csvFile.addEventListener("change",(ev)=>{
   rdr.readAsArrayBuffer(file);
 });
 
-// Export
+/***** Export ***********************************************************/
 exportBtn.addEventListener("click", ()=>{
   const data={activeCards,reserveCards,learnedCards};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="deck.json"; a.click();
 });
 
-// Deckwechsel
+/***** Deckwechsel ******************************************************/
 deckSelect.addEventListener("change", ()=>{
   currentDeckId=deckSelect.value;
   activeCards = normalizeCards(JSON.parse(localStorage.getItem(deckKey("cards"))||"[]"));
@@ -485,26 +549,17 @@ deckSelect.addEventListener("change", ()=>{
   saveData(); applyLabelInputs(); render(); refreshCountsUI();
 });
 
-// Sprache
+/***** Sprache **********************************************************/
 langSelect.addEventListener("change", ()=>{ currentLang=langSelect.value; localStorage.setItem(LS_LANG,currentLang); applyTranslations(); render(); });
 
-// Deck-Aktionen
+/***** Deck-Aktionen ****************************************************/
 deckAddBtn.addEventListener("click", createNewDeck);
 deckRenameBtn.addEventListener("click", renameCurrentDeck);
 deckDeleteBtn.addEventListener("click", deleteCurrentDeck);
 
-// Größenwechsel
+/***** Größenwechsel ****************************************************/
 addEventListener("resize", refreshCountsUI);
-addEventListener("orientationchange", ()=>setTimeout(refreshCountsUI,80));
-
-/***** Top-Mode-Toggle **************************************************/
-$("toggleModeBtn").addEventListener("click", ()=>{
-  if(actionLock) return;
-  mode=(mode==="lernen")?"prüfen":"lernen";
-  lock(220);
-  render(); refreshCountsUI(); updateTopModeText();
-});
-function updateTopModeText(){ $("toggleModeBtn").textContent=(mode==="lernen")?T[currentLang].toTest:T[currentLang].toLearn; }
+addEventListener("orientationchange", ()=>setTimeout(()=>{ refreshCountsUI(); if(sheet.classList.contains("open")) closeSheet(); },80));
 
 /***** Editor ***********************************************************/
 editBtn.addEventListener("click", ()=>{
@@ -533,13 +588,11 @@ deleteBtn.addEventListener("click", ()=>{
   }
   currentCard=null; saveData(); render(); refreshCountsUI();
 });
-
 resetProgressBtn.addEventListener("click", ()=>{
   if(!confirm("Nur Lernfortschritt zurücksetzen? (Alle aktiven Karten zurück in Box 1)")) return;
   activeCards = activeCards.map(c=>({...c, box:1, lastSeen:null, introduced:false, wrong:0}));
   saveData(); render(); refreshCountsUI();
 });
-
 resetAllBtn.addEventListener("click", ()=>{
   const deck=currentDeck(); if(!deck) return;
   if(!confirm(`Wirklich ALLE Karten & Fortschritte in „${deck.name}“ löschen?`)) return;
@@ -555,9 +608,10 @@ function init(){
   const added=fillBox1(20); if(added>0){ mode="lernen"; const b1=activeCards.filter(c=>c.box===1).length; learnIndex=Math.max(0,b1-added); }
   applyLabelInputs(); applyTranslations(); updateGamification(); updateLegend();
 
-  // **Editor sicher geschlossen halten** – iOS Safari
+  // Editor sicher geschlossen halten
   editPanel.hidden = true;
 
   render(); refreshCountsUI();
 }
 init();
+
