@@ -9,53 +9,48 @@
 </head>
 <body>
 
-  <!-- Header -->
+  <!-- Header (Portrait & Desktop sichtbar) -->
   <header>
     <h1 id="appTitle">Vokabeltrainer</h1>
-
-    <!-- Landscape-Info (nur Touch & Landscape sichtbar via CSS) -->
-    <div id="landInfo"><span id="landInfoText">B1: 0</span></div>
-    <button id="freshBtn" class="pill" type="button">+7</button>
-    <button id="landModeToggle" type="button">⇆</button>
   </header>
 
-  <!-- Gamification-Leiste -->
+  <!-- Gamification-Leiste (Portrait & Desktop) -->
   <div class="gbar">
     <div class="chip">⭐ <span id="pointsChip">0</span></div>
     <div class="chip">🎚️ <span id="levelChip">1</span></div>
     <div class="chip">🔥 <span id="streakChip">0</span>d</div>
   </div>
 
-  <!-- Globale Controls -->
+  <!-- Globale Controls (Portrait & Desktop) -->
   <div class="controls global">
-    <button id="toggleModeBtn" class="pill secondary">Lernen</button>
-    <button id="editBtn" class="pill">✏️ Bearbeiten</button>
-    <button id="drawerToggleTop" class="pill ghost">☰ Werkzeug</button>
+    <button id="toggleModeBtn" class="pill secondary" type="button">Lernen</button>
+    <button id="editBtn" class="pill" type="button">✏️ Bearbeiten</button>
+    <button id="drawerToggleTop" class="pill ghost" type="button">☰ Werkzeug</button>
   </div>
 
-  <!-- Karten & Modusbereiche -->
+  <!-- Hauptbereich -->
   <main id="mainArea">
-    <!-- LERNEN: zeigt beide Seiten -->
+    <!-- LERNEN -->
     <section id="learnPair" aria-live="polite">
       <div id="tileEs" class="tile front"></div>
       <div id="tileDe" class="tile back"></div>
     </section>
 
-    <!-- PRÜFEN: Zwei-Karten-Flow -->
+    <!-- PRÜFEN -->
     <section id="testPair" class="pair" aria-live="polite" hidden>
       <div id="testLeft"  class="tile front"></div>
       <div id="testRight" class="tile back muted"></div>
     </section>
     <div id="testActions" class="controls test-actions" hidden>
-      <button id="btnWrong" class="pill danger">❌ Falsch</button>
-      <button id="btnRight" class="pill success">✅ Richtig</button>
+      <button id="btnWrong" class="pill danger" type="button">❌ Falsch</button>
+      <button id="btnRight" class="pill success" type="button">✅ Richtig</button>
     </div>
 
-    <!-- Box-Balken -->
+    <!-- Box-Balken (Portrait & Desktop dauerhaft sichtbar; Landscape im Sheet) -->
     <div id="boxChart" aria-label="Box-Übersicht"></div>
   </main>
 
-  <!-- Inline-Editor -->
+  <!-- Inline-Editor (immer versteckt bis Klick) -->
   <div id="editPanel" class="edit-panel" hidden>
     <input id="editA" type="text" placeholder="A" />
     <input id="editB" type="text" placeholder="B" />
@@ -107,8 +102,8 @@
     <section class="panel">
       <h3 id="importTitle">CSV Import</h3>
       <div class="row">
-        <input type="file" id="csvFile" accept=".csv" />
-        <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; Komma/Semikolon</small>
+        <input type="file" id="csvFile" accept="text/csv,.csv" />
+        <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; , oder ;</small>
       </div>
       <div class="row">
         <button id="exportBtn" class="pill" type="button">Exportieren</button>
@@ -152,6 +147,28 @@
 
   <!-- FAB für Drawer -->
   <button id="drawerToggle" title="Werkzeuge" aria-label="Werkzeuge">☰</button>
+
+  <!-- Landscape: Fixes Panel (Status + Richtig/Falsch – nur nach Reveal) -->
+  <div id="landHud">
+    <div id="landInfo"><span id="landInfoText">B1: 0</span></div>
+    <div class="land-actions" id="landActions" hidden>
+      <button id="landWrong" class="pill danger" type="button">❌</button>
+      <button id="landRight" class="pill success" type="button">✅</button>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet (Landscape) -->
+  <div id="sheet" aria-hidden="true">
+    <div id="sheetHandle" aria-label="Sheet öffnen/schließen"></div>
+    <div id="sheetContent">
+      <div class="sheet-row">
+        <button id="freshBtn" class="pill fresh" type="button">+7</button>
+        <!-- Toggle zeigt aktuellen Status -->
+        <button id="landModeToggle" class="pill swap" type="button">Lernen</button>
+      </div>
+      <div id="boxChartSheet"></div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
