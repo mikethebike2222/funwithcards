@@ -2,7 +2,6 @@
    Vokabeltrainer – styles.css
    =============================== */
 
-/* ---- Design Tokens ---- */
 :root{
   --header-bg:#111827;
   --text:#111827;
@@ -10,17 +9,18 @@
 
   --chip:#2563eb;
 
-  --accent:#0ea5e9;        /* Richtung-Panel */
+  --accent:#0ea5e9;
   --accent-strong:#0369a1;
 
-  --ok:#176427;            /* Buttons */
+  --ok:#176427;
   --warn:#8f1b2b;
+
+  --sheet-bg:#ffffff;
+  --sheet-shadow:0 -20px 40px rgba(0,0,0,.14);
 }
 
 *{ box-sizing:border-box; }
 html,body{ height:100%; }
-
-/* ---- Base ---- */
 body{
   margin:0;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
@@ -28,10 +28,10 @@ body{
   background:var(--bg);
   display:flex;
   flex-direction:column;
-  overflow:auto;           /* Scroll erlaubt (Zoom-freundlich) */
+  overflow:auto;
 }
 
-/* ---- Header ---- */
+/* Header (Portrait & Desktop) */
 header{
   position:sticky;
   top:0;
@@ -45,51 +45,7 @@ header{
 }
 #appTitle{ margin:0; font-size:1.2rem; }
 
-/* ---- Landscape-only controls (Touch) ---- */
-#landInfo,#freshBtn,#landModeToggle{ display:none; }
-
-@media (orientation:landscape) and (pointer:coarse){
-  #landInfo{
-    display:block;
-    position:fixed;
-    top:calc(12px + env(safe-area-inset-top));
-    right:calc(12px + env(safe-area-inset-right));
-    background:var(--chip);
-    color:#fff;
-    padding:6px 10px;
-    border-radius:12px;
-    font-size:.9rem;
-    z-index:50;
-  }
-  #freshBtn{
-    display:block;
-    position:fixed;
-    right:calc(12px + env(safe-area-inset-right));
-    top:calc(48px + env(safe-area-inset-top));
-    z-index:50;
-    padding:4px 8px;
-    border:0;
-    border-radius:8px;
-    background:#10b981;
-    color:#fff;
-    font-size:.8rem;
-  }
-  #landModeToggle{
-    display:block;
-    position:fixed;
-    right:calc(12px + env(safe-area-inset-right));
-    top:calc(84px + env(safe-area-inset-top));
-    z-index:50;
-    padding:8px 10px;
-    border-radius:999px;
-    border:0;
-    background:#111827;
-    color:#fff;
-    font-size:14px;
-  }
-}
-
-/* ---- Gamification ---- */
+/* Gamification */
 .gbar{
   width:min(1100px,96%);
   margin:8px auto 6px;
@@ -106,7 +62,7 @@ header{
   font-size:12px;
 }
 
-/* ---- Global Controls ---- */
+/* Global Controls (Portrait & Desktop) */
 .controls.global{
   width:min(1100px,96%);
   margin:4px auto 8px;
@@ -126,7 +82,7 @@ header{
 .pill.success{ background:var(--ok); color:#fff; }
 .pill.danger{ background:var(--warn); color:#fff; }
 
-/* ---- Main area ---- */
+/* Main */
 #mainArea{
   flex:1;
   display:flex;
@@ -137,7 +93,7 @@ header{
   padding:10px 0 16px;
 }
 
-/* ---- Cards ---- */
+/* Cards (Portrait & Desktop) */
 .tile{
   display:flex;
   align-items:center;
@@ -154,18 +110,17 @@ header{
   word-break:keep-all;
   hyphens:auto;
 }
-#tileEs, #testLeft  { background:#dbeafe; }   /* „Vorderseite“ */
-#tileDe, #testRight { background:#fef3c7; }   /* „Rückseite“  */
+#tileEs, #testLeft  { background:#dbeafe; }
+#tileDe, #testRight { background:#fef3c7; }
 .muted{ color:#6b7280; }
 
-/* ---- Test action buttons ---- */
 .controls.test-actions{
   display:flex;
   gap:10px;
   justify-content:center;
 }
 
-/* ---- Box bar chart ---- */
+/* Box bar (Portrait & Desktop sichtbar) */
 #boxChart{
   width:100%;
   height:110px;
@@ -185,7 +140,7 @@ header{
 }
 .bar.active{ outline:2px solid #111827; }
 
-/* ---- Inline editor ---- */
+/* Inline editor */
 .edit-panel{
   width:min(1100px,96%);
   margin:6px auto;
@@ -204,10 +159,9 @@ header{
   border-radius:10px;
   font-size:16px;
 }
-/* Harte Absicherung: Editor ist wirklich unsichtbar, wenn hidden gesetzt */
 .edit-panel[hidden]{ display:none !important; }
 
-/* ---- Drawer ---- */
+/* Drawer */
 .drawer{
   position:fixed;
   top:0; right:-100%;
@@ -221,7 +175,6 @@ header{
   overflow:auto;
 }
 .drawer.open{ right:0; }
-
 #drawerClose{
   position:sticky;
   top:0;
@@ -231,7 +184,6 @@ header{
   font-size:24px;
   padding:4px 8px;
 }
-
 .panel{
   background:#fff;
   border:1px solid #e5e7eb;
@@ -239,7 +191,6 @@ header{
   padding:12px;
   margin:10px 0;
 }
-
 .row{
   display:flex;
   gap:8px;
@@ -247,7 +198,6 @@ header{
   margin:8px 0;
   flex-wrap:wrap;
 }
-
 input, select, button{ font-size:1rem; }
 input[type="text"], select{
   width:100%;
@@ -257,7 +207,6 @@ input[type="text"], select{
 }
 .muted{ color:#6b7280; }
 
-/* ---- Pie legend ---- */
 .legend{
   display:flex;
   gap:10px;
@@ -274,7 +223,7 @@ input[type="text"], select{
   margin-right:6px;
 }
 
-/* ---- Direction panel (prominent) ---- */
+/* Direction panel */
 .direction-panel{
   border-color: var(--accent);
   box-shadow:0 0 0 3px rgba(14,165,233,.08) inset;
@@ -290,7 +239,7 @@ input[type="text"], select{
   color:#fff;
 }
 
-/* ---- Floating Action Button ---- */
+/* FAB */
 #drawerToggle{
   position:fixed;
   right:12px;
@@ -305,15 +254,10 @@ input[type="text"], select{
   font-size:24px;
 }
 
-/* ---- Deck actions compact ---- */
-.deck-actions{ gap:6px; }
-.deck-actions .pill{ padding:8px 10px; font-size:16px; }
-.deck-actions .pill.ghost{ background:#e5e7eb; color:#111827; }
-
-/* ---- Manage actions ---- */
+/* Manage actions */
 .manage-actions{ gap:8px; }
 
-/* ---- Accessibility helper ---- */
+/* Accessibility helper */
 .sr-only{
   position:absolute !important;
   width:1px; height:1px;
@@ -322,15 +266,113 @@ input[type="text"], select{
   white-space:nowrap; border:0;
 }
 
-/* ---- Desktop: erzwinge Portrait-UI ---- */
+/* ---- Desktop: Portrait-UI beibehalten ---- */
 @media (orientation:landscape) and (pointer:fine){
-  #landInfo,#freshBtn,#landModeToggle{ display:none !important; }
+  /* Desktop behält Portrait-Struktur */
+}
+
+/* =======================================
+   Landscape (Touch): Vollbild-Layout
+   ======================================= */
+@media (orientation:landscape) and (pointer:coarse){
+  /* Header, Gamification, Top-Controls, BoxChart ausblenden */
+  header, .gbar, .controls.global, #boxChart { display:none !important; }
+
+  body{ overflow:hidden; }
+
+  /* Zwei Karten nebeneinander – feste Größe */
+  #mainArea{
+    flex:1;
+    width:100vw; height:100vh;
+    padding:0;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 100vh;
+    gap: min(2vw, 20px);
+    align-items:center;
+    justify-items:center;
+  }
+
+  #learnPair, #testPair{
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: min(2vw, 20px);
+    align-items:center;
+    width:100%;
+    padding: min(2vw, 20px);
+  }
+
+  #learnPair .tile, #testPair .tile{
+    width: 100%;
+    height: calc(100vh - 2*min(2vw, 20px));
+    max-height: calc(100vh - 2*min(2vw, 20px));
+    aspect-ratio: 4/3;
+    border-radius: 16px;
+    font-size: clamp(22px, 4.2vw, 44px);
+  }
+
+  /* Fixes Panel oben rechts */
+  #landHud{
+    position:fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    display:flex;
+    align-items:center;
+    gap:10px;
+    z-index:60;
+  }
+  #landInfo{
+    background:var(--chip);
+    color:#fff;
+    padding:6px 10px;
+    border-radius:12px;
+    font-size:.9rem;
+  }
+  .land-actions .pill{ padding:8px 10px; }
+
+  /* Bottom Sheet */
+  #sheet{
+    position:fixed;
+    left:0; right:0;
+    bottom:0;
+    transform: translateY(100%);
+    transition: transform .25s ease;
+    background: var(--sheet-bg);
+    box-shadow: var(--sheet-shadow);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    z-index:80;
+  }
+  #sheet.open{ transform: translateY(0%); }
+  #sheetHandle{
+    width:52px; height:6px; border-radius:999px;
+    background:#d1d5db; margin:10px auto;
+  }
+  #sheetContent{ padding: 6px 14px 14px; }
+  .sheet-row{
+    display:flex; gap:10px; align-items:center; justify-content:flex-start;
+    margin-bottom:8px;
+  }
+  #freshBtn.pill.fresh{ background:#10b981; color:#fff; }
+  #landModeToggle.pill.swap{ background:#111827; color:#fff; }
+  #boxChartSheet{
+    width:100%; height:110px; background:#e5e7eb;
+    display:flex; align-items:flex-end; justify-content:space-around;
+    border-top:1px solid #e5e7eb;
+    border-radius:10px;
+    padding:8px 8px 0;
+  }
+  #boxChartSheet .bar{
+    flex:1; margin:0 2px; min-height:5px; background:#3b82f6; border-radius:2px 2px 0 0; cursor:pointer;
+  }
+  #boxChartSheet .bar.active{ outline:2px solid #111827; }
 }
 
 /* =======================================
    Prüfmodus – Animationsklassen
    ======================================= */
-
 .test-anim{ will-change: transform, opacity; }
 .out-up   { animation: outUp 220ms ease forwards; }
 .out-down { animation: outDown 220ms ease forwards; }
@@ -341,6 +383,5 @@ input[type="text"], select{
 @keyframes inFade  { from { opacity: 0; transform: translateY(6px); }
                      to   { opacity: 1; transform: translateY(0); } }
 
-/* Damit die Testkacheln als Block animieren */
 #testPair{ position:relative; }
-#testPair .tile{ transition:none; }  /* verhindert doppelte Übergänge */
+#testPair .tile{ transition:none; }
