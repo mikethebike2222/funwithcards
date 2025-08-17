@@ -3,26 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <!-- Zoomen erlaubt -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vokabeltrainer</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <!-- Header (Portrait & Desktop) -->
-  <header>
+  <header class="app-header">
     <h1 id="appTitle">Vokabeltrainer</h1>
     <small id="modeHint" class="mode-hint">Modus: Lernen</small>
   </header>
 
-  <!-- Gamification -->
+  <!-- Gamification (Portrait & Desktop) -->
   <div class="gbar">
     <div class="chip">⭐ <span id="pointsChip">0</span></div>
     <div class="chip">🎚️ <span id="levelChip">1</span></div>
     <div class="chip">🔥 <span id="streakChip">0</span>d</div>
   </div>
 
-  <!-- Portrait / Desktop: globale Controls -->
+  <!-- Globale Controls (Portrait & Desktop) -->
   <div class="controls global">
     <button id="toggleModeBtn" class="pill secondary" type="button">Lernen</button>
     <button id="editBtn" class="pill" type="button">✏️ Bearbeiten</button>
@@ -39,7 +39,7 @@
 
     <!-- PRÜFEN -->
     <section id="testPair" class="pair" aria-live="polite" hidden>
-      <div id="testLeft"  class="tile front"></div>
+      <div id="testLeft" class="tile front"></div>
       <div id="testRight" class="tile back muted"></div>
     </section>
     <div id="testActions" class="controls test-actions" hidden>
@@ -51,12 +51,12 @@
     <div id="boxChart" aria-label="Box-Übersicht"></div>
   </main>
 
-  <!-- Inline-Editor (nur bei Klick sichtbar) -->
+  <!-- Inline-Editor (öffnet per Button) -->
   <div id="editPanel" class="edit-panel" hidden>
-    <input id="editA" type="text" placeholder="A" />
-    <input id="editB" type="text" placeholder="B" />
+    <input id="editA" type="text" placeholder="A">
+    <input id="editB" type="text" placeholder="B">
     <div class="row">
-      <button id="saveEditBtn"   class="pill success"  type="button">Speichern</button>
+      <button id="saveEditBtn" class="pill success" type="button">Speichern</button>
       <button id="cancelEditBtn" class="pill secondary" type="button">Abbrechen</button>
     </div>
   </div>
@@ -88,14 +88,14 @@
         <select id="deckSelect"></select>
       </div>
       <div class="row deck-actions">
-        <button id="deckAddBtn"     class="pill ghost"     type="button" title="Neue Übung">➕</button>
-        <button id="deckRenameBtn"  class="pill secondary" type="button" title="Umbenennen">✏️</button>
-        <button id="deckDeleteBtn"  class="pill danger"    type="button" title="Löschen">🗑️</button>
+        <button id="deckAddBtn" class="pill ghost" type="button" title="Neue Übung">➕</button>
+        <button id="deckRenameBtn" class="pill secondary" type="button" title="Umbenennen">✏️</button>
+        <button id="deckDeleteBtn" class="pill danger" type="button" title="Löschen">🗑️</button>
       </div>
       <div class="row">
-        <input type="text" id="sideALabelInput" placeholder="A" />
-        <input type="text" id="sideBLabelInput" placeholder="B" />
-        <button id="saveLabelsBtn" class="pill" type="button" title="Labels speichern">✔︎</button>
+        <input type="text" id="sideALabelInput" placeholder="A">
+        <input type="text" id="sideBLabelInput" placeholder="B">
+        <button id="saveLabelsBtn" class="pill" type="button">✔︎</button>
       </div>
     </section>
 
@@ -103,19 +103,16 @@
     <section class="panel">
       <h3 id="importTitle">CSV Import</h3>
       <div class="row">
-        <input type="file" id="csvFile" accept=".csv,text/csv,.txt" />
+        <input type="file" id="csvFile" accept=".csv,text/csv,.txt">
         <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; , oder ;</small>
       </div>
       <div class="row">
         <button id="exportBtn" class="pill" type="button">Exportieren</button>
       </div>
+
       <h4 id="addCardTitle" class="subhead">Neue Karte hinzufügen</h4>
-      <div class="row">
-        <input type="text" id="inputSideA" placeholder="A" />
-      </div>
-      <div class="row">
-        <input type="text" id="inputSideB" placeholder="B" />
-      </div>
+      <div class="row"><input type="text" id="inputSideA" placeholder="A"></div>
+      <div class="row"><input type="text" id="inputSideB" placeholder="B"></div>
       <button id="addCardBtn" class="pill" type="button">Karte hinzufügen</button>
     </section>
 
@@ -124,29 +121,29 @@
       <h3 id="directionBlockTitle">Abfrage-Richtung</h3>
       <div class="row">
         <span id="directionBadge" class="direction-badge">A → B</span>
-        <button id="toggleDirectionBtn" class="pill direction-btn" type="button" title="Richtung wechseln">Richtung wechseln</button>
+        <button id="toggleDirectionBtn" class="pill direction-btn" type="button">Richtung wechseln</button>
       </div>
     </section>
 
     <!-- 5) Statistik -->
     <section class="panel">
       <h3 id="statsTitle">Statistik</h3>
-      <canvas id="pieChart" width="220" height="220" aria-label="Kartenverteilung"></canvas>
-      <div id="legend" class="legend" aria-hidden="true"></div>
+      <canvas id="pieChart" width="220" height="220"></canvas>
+      <div id="legend" class="legend"></div>
     </section>
 
     <!-- 6) Verwalten -->
     <section class="panel">
       <h3>Verwalten</h3>
       <div class="row manage-actions">
-        <button id="deleteBtn"         class="pill danger"    type="button">Aktive Karte löschen</button>
-        <button id="resetProgressBtn"  class="pill secondary" type="button">Nur Fortschritt löschen</button>
-        <button id="resetAllBtn"       class="pill danger"    type="button">Kartendeck löschen</button>
+        <button id="deleteBtn" class="pill danger" type="button">Aktive Karte löschen</button>
+        <button id="resetProgressBtn" class="pill secondary" type="button">Nur Fortschritt löschen</button>
+        <button id="resetAllBtn" class="pill danger" type="button">Kartendeck löschen</button>
       </div>
     </section>
   </aside>
 
-  <!-- FAB (öffnet Drawer) -->
+  <!-- Werkzeug-FAB (sichtbar in allen Ausrichtungen) -->
   <button id="drawerToggle" title="Werkzeuge" aria-label="Werkzeuge">☰</button>
 
   <!-- Landscape HUD (Status + ✅/❌ nach Reveal) -->
@@ -158,9 +155,9 @@
     </div>
   </div>
 
-  <!-- Bottom-Sheet (öffnet über Seiten-Tab) -->
+  <!-- Bottom-Sheet im Querformat, öffnet per sichtbarem Button (⋯) unten mittig -->
   <div id="sheet" aria-hidden="true">
-    <button id="sheetTab" aria-label="Sheet öffnen">⋯</button>
+    <button id="sheetOpen" aria-label="Mehr">⋯</button>
     <div id="sheetContent">
       <div class="sheet-row">
         <button id="freshBtn" class="pill fresh" type="button">+7</button>
