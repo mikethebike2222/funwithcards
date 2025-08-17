@@ -9,19 +9,20 @@
 </head>
 <body>
 
-  <!-- Header (Portrait & Desktop sichtbar) -->
+  <!-- Header (Portrait & Desktop) -->
   <header>
     <h1 id="appTitle">Vokabeltrainer</h1>
+    <small id="modeHint" class="mode-hint">Modus: Lernen</small>
   </header>
 
-  <!-- Gamification-Leiste (Portrait & Desktop) -->
+  <!-- Gamification -->
   <div class="gbar">
     <div class="chip">⭐ <span id="pointsChip">0</span></div>
     <div class="chip">🎚️ <span id="levelChip">1</span></div>
     <div class="chip">🔥 <span id="streakChip">0</span>d</div>
   </div>
 
-  <!-- Globale Controls (Portrait & Desktop) -->
+  <!-- Portrait / Desktop: globale Controls -->
   <div class="controls global">
     <button id="toggleModeBtn" class="pill secondary" type="button">Lernen</button>
     <button id="editBtn" class="pill" type="button">✏️ Bearbeiten</button>
@@ -46,11 +47,11 @@
       <button id="btnRight" class="pill success" type="button">✅ Richtig</button>
     </div>
 
-    <!-- Box-Balken (Portrait & Desktop dauerhaft sichtbar; Landscape im Sheet) -->
+    <!-- Box-Balken (Portrait & Desktop) -->
     <div id="boxChart" aria-label="Box-Übersicht"></div>
   </main>
 
-  <!-- Inline-Editor (immer versteckt bis Klick) -->
+  <!-- Inline-Editor (nur bei Klick sichtbar) -->
   <div id="editPanel" class="edit-panel" hidden>
     <input id="editA" type="text" placeholder="A" />
     <input id="editB" type="text" placeholder="B" />
@@ -60,7 +61,7 @@
     </div>
   </div>
 
-  <!-- Drawer / Werkzeuge -->
+  <!-- Werkzeug-Drawer -->
   <aside id="drawer" class="drawer" aria-hidden="true">
     <button id="drawerClose" title="Schließen" aria-label="Schließen">×</button>
     <h2 id="toolsTitle">Werkzeuge</h2>
@@ -79,7 +80,7 @@
       </div>
     </section>
 
-    <!-- 2) Übungen (Decks) -->
+    <!-- 2) Übungen -->
     <section class="panel">
       <h3 id="decksBlockTitle">Übungen</h3>
       <div class="row">
@@ -102,7 +103,7 @@
     <section class="panel">
       <h3 id="importTitle">CSV Import</h3>
       <div class="row">
-        <input type="file" id="csvFile" accept="text/csv,.csv" />
+        <input type="file" id="csvFile" accept=".csv,text/csv,.txt" />
         <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; , oder ;</small>
       </div>
       <div class="row">
@@ -118,7 +119,7 @@
       <button id="addCardBtn" class="pill" type="button">Karte hinzufügen</button>
     </section>
 
-    <!-- 4) Richtungswechsel (prominent) -->
+    <!-- 4) Richtungswechsel -->
     <section class="panel direction-panel">
       <h3 id="directionBlockTitle">Abfrage-Richtung</h3>
       <div class="row">
@@ -127,7 +128,7 @@
       </div>
     </section>
 
-    <!-- 5) Statistik – Tortendiagramm mit Boxen -->
+    <!-- 5) Statistik -->
     <section class="panel">
       <h3 id="statsTitle">Statistik</h3>
       <canvas id="pieChart" width="220" height="220" aria-label="Kartenverteilung"></canvas>
@@ -145,10 +146,10 @@
     </section>
   </aside>
 
-  <!-- FAB für Drawer -->
+  <!-- FAB (öffnet Drawer) -->
   <button id="drawerToggle" title="Werkzeuge" aria-label="Werkzeuge">☰</button>
 
-  <!-- Landscape: Fixes Panel (Status + Richtig/Falsch – nur nach Reveal) -->
+  <!-- Landscape HUD (Status + ✅/❌ nach Reveal) -->
   <div id="landHud">
     <div id="landInfo"><span id="landInfoText">B1: 0</span></div>
     <div class="land-actions" id="landActions" hidden>
@@ -157,13 +158,12 @@
     </div>
   </div>
 
-  <!-- Bottom Sheet (Landscape) -->
+  <!-- Bottom-Sheet (öffnet über Seiten-Tab) -->
   <div id="sheet" aria-hidden="true">
-    <div id="sheetHandle" aria-label="Sheet öffnen/schließen"></div>
+    <button id="sheetTab" aria-label="Sheet öffnen">⋯</button>
     <div id="sheetContent">
       <div class="sheet-row">
         <button id="freshBtn" class="pill fresh" type="button">+7</button>
-        <!-- Toggle zeigt aktuellen Status -->
         <button id="landModeToggle" class="pill swap" type="button">Lernen</button>
       </div>
       <div id="boxChartSheet"></div>
