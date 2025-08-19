@@ -13,7 +13,7 @@
 </head>
 <body>
 
-  <!-- TOP: Chips + Modus + Bearbeiten -->
+  <!-- TOP -->
   <header id="topbar" class="topbar">
     <div class="chips">
       <div class="chip"><span>⭐</span><b id="pointsChip">0</b></div>
@@ -30,21 +30,21 @@
 
   <!-- STAGE -->
   <main id="app" class="app">
-    <section id="cardsArea" class="cards">
+    <section id="cardsArea" class="cards" aria-live="polite">
       <div id="cardA" class="card card-a" tabindex="0"></div>
       <div id="cardB" class="card card-b" tabindex="0"></div>
     </section>
 
-    <!-- Richtig/Falsch (eine Leiste, zentral & angehoben) -->
+    <!-- Eine (!) RF-Leiste -->
     <div id="rfBar" class="rfbar" aria-hidden="true">
       <button id="btnWrong" class="btn danger">❌ <span data-i18n="wrong">Falsch</span></button>
       <button id="btnRight" class="btn success">✅ <span data-i18n="right">Richtig</span></button>
     </div>
 
-    <!-- Boxbadge nur Landscape -->
+    <!-- Landscape-Badge -->
     <div id="boxBadge" class="boxbadge" aria-hidden="true">B1: 0</div>
 
-    <!-- Inline-Editor (standard: versteckt) -->
+    <!-- Inline-Editor (versteckt) -->
     <div id="editPanel" class="editpanel" hidden>
       <input id="editA" type="text" autocomplete="off" inputmode="text">
       <input id="editB" type="text" autocomplete="off" inputmode="text">
@@ -55,7 +55,7 @@
     </div>
   </main>
 
-  <!-- Drawer / Werkzeuge -->
+  <!-- Drawer -->
   <aside id="drawer" class="drawer" aria-hidden="true">
     <div class="drawer-head">
       <h2 data-i18n="tools">Werkzeuge</h2>
@@ -103,6 +103,13 @@
     <section class="panel">
       <h3 data-i18n="direction">Richtung</h3>
       <button id="toggleDirectionBtn" class="pill primary">A → B</button>
+    </section>
+
+    <!-- NEU: Balkendiagramm zum Box-Wechsel -->
+    <section class="panel">
+      <h3>Boxen</h3>
+      <div id="boxBars" class="boxbars" role="list" aria-label="Boxübersicht"></div>
+      <small id="boxBarsHint">Tippe auf eine Box zum Prüfen. Box 1 bleibt Lernen.</small>
     </section>
 
     <section class="panel">
