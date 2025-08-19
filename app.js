@@ -121,6 +121,12 @@ function fitText(el, min=16, max=72){
   el.style.fontSize=best+"px";
 }
 
+/* ====== RF-Bar Sichtbarkeit (NEU) ====== */
+function setRF(show){
+  rfBar.style.display = show ? 'flex' : 'none';
+  rfBar.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
 /* ====== Render ====== */
 let currentIndex = 0;
 let currentCard = null;
@@ -150,7 +156,7 @@ function render(){
   toggleDirectionBtn.textContent = direction==="a2b" ? `${A} → ${B}` : `${B} → ${A}`;
 
   if(mode==="lernen"){
-    rfBar.setAttribute("aria-hidden","true");
+    setRF(false);                    // <<< RF-Bar im Lernen NIE sichtbar
     const c = pickLearnCard();
     if(!c){ cardA.textContent="Keine Karten"; cardB.textContent=""; fitText(cardA); fitText(cardB); updateBoxUI(); return; }
     cardA.textContent = direction==="a2b" ? c.sideA : c.sideB;
@@ -158,10 +164,10 @@ function render(){
     fitText(cardA); fitText(cardB);
   }else{
     if(!currentCard) currentCard = pickTestCard();
-    if(!currentCard){ cardA.textContent="Keine Karten"; cardB.textContent=""; rfBar.setAttribute("aria-hidden","true"); fitText(cardA); fitText(cardB); updateBoxUI(); return; }
+    if(!currentCard){ cardA.textContent="Keine Karten"; cardB.textContent=""; setRF(false); fitText(cardA); fitText(cardB); updateBoxUI(); return; }
     cardA.textContent = direction==="a2b" ? currentCard.sideA : currentCard.sideB;
     cardB.textContent = showAnswer ? (direction==="a2b" ? currentCard.sideB : currentCard.sideA) : "";
-    rfBar.setAttribute("aria-hidden", showAnswer ? "false" : "true");
+    setRF(showAnswer);               // <<< RF-Bar nur NACH Aufdecken sichtbar
     fitText(cardA); fitText(cardB);
   }
 
@@ -184,7 +190,6 @@ function render(){
   cardsArea.addEventListener("touchmove", e=>{
     const t=e.touches[0]; dx=t.clientX-sx; dy=t.clientY-sy;
     if(Math.abs(dx)>12||Math.abs(dy)>12) moved=true;
-    // Wenn horizontal deutlich dominiert, vertikales Scrollen unterdrücken
     if(Math.abs(dx) > Math.abs(dy) + 6) e.preventDefault();
   },{passive:false});
   cardsArea.addEventListener("touchend", ()=>{
@@ -391,7 +396,6 @@ function drawPie(){
 }
 
 function updateBoxUI(){
-  // Boxbars
   const counts=[1,2,3,4,5].map(i=>activeCards.filter(c=>c.box===i).length);
   const max=Math.max(...counts,1);
   boxBars.innerHTML="";
