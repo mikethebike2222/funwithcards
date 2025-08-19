@@ -43,6 +43,7 @@ const landModeToggle=$("landModeToggle"), landBoxBadge=$("landBoxBadge");
 const learnPair=$("learnPair"), tileEs=$("tileEs"), tileDe=$("tileDe");
 const testPair=$("testPair"), testLeft=$("testLeft"), testRight=$("testRight");
 const testActions=$("testActions"), btnWrong=$("btnWrong"), btnRight=$("btnRight");
+/* Seitliche Landscape-Buttons sind weiterhin im DOM erlaubt, werden aber per CSS versteckt */
 const landActions=$("landActions"), landRight=$("landRight"), landWrong=$("landWrong");
 const boxChart=$("boxChart"), boxChartSheet=$("boxChartSheet");
 const drawerToggle=$("drawerToggle"), sheet=$("sheet"), sheetClose=$("sheetClose");
@@ -186,10 +187,10 @@ function updateBoxBadge(){
 }
 let currentCard=null;
 function render(){
-  // immer alles zurücksetzen (Fix für Doppelanzeige)
+  // immer alles zurücksetzen
   testRevealed=false;
   testActions.hidden=true;
-  landActions.hidden=true;
+  landActions.hidden=true; // bleibt generell versteckt (CSS), aber sicherheitshalber
 
   directionBadge.textContent=dirText();
 
@@ -236,18 +237,22 @@ function render(){
     const t=e.changedTouches?e.changedTouches[0]:e;
     const dx=t.clientX-startX, dy=t.clientY-startY; if(Math.abs(dy)>60) return;
     if(dx<-TH){ learnIndex++; } else if(dx>TH){ learnIndex=Math.max(0,learnIndex-1); } else { learnIndex++; }
-    markActivity(1); render(); lockit();
+    markActivity(1); render();
+    lockit();
   }
   ["touchstart","mousedown"].forEach(ev=>area.addEventListener(ev,onStart,{passive:true}));
   ["touchend","mouseup","mouseleave"].forEach(ev=>area.addEventListener(ev,onEnd));
 })();
 
-// Prüfen – Tap zum Reveal, dann ✅/❌
+// Prüfen – Tap zum Reveal, dann ✅/❌ (nur unten)
 function revealAnswer(){
   if(mode!=="prüfen" || !currentCard || testRevealed) return;
   const ans=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
   testRight.textContent=ans; testRight.classList.remove("muted");
-  testRevealed=true; testActions.hidden=false; landActions.hidden=false;
+  testRevealed=true;
+  testActions.hidden=false;                 // unten einblenden
+  /* keine seitlichen Buttons mehr:
+     landActions.hidden=false;  <-- entfernt */
   fitTileText(testRight);
 }
 testPair.addEventListener("click", revealAnswer);
@@ -285,13 +290,13 @@ function advanceWrong(){
 }
 btnRight.addEventListener("click", advanceRight);
 btnWrong.addEventListener("click", advanceWrong);
-landRight.addEventListener("click", advanceRight);
-landWrong.addEventListener("click", advanceWrong);
+/* Listener für seitliche Buttons können bleiben – Element ist unsichtbar */
+landRight?.addEventListener("click", advanceRight);
+landWrong?.addEventListener("click", advanceWrong);
 
 /***** Mode Toggle *****/
 function toggleMode(){
   mode=(mode==="lernen")?"prüfen":"lernen";
-  // sicherstellen, dass jeweils genau EINE Section sichtbar ist
   learnPair.hidden = (mode!=="lernen");
   testPair.hidden  = (mode!=="prüfen");
   testRevealed=false; testActions.hidden=true; landActions.hidden=true;
@@ -449,4 +454,3 @@ function init(){
   render(); refreshCountsUI();
 }
 init();
-
