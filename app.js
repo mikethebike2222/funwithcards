@@ -43,7 +43,6 @@ const landModeToggle=$("landModeToggle"), landBoxBadge=$("landBoxBadge");
 const learnPair=$("learnPair"), tileEs=$("tileEs"), tileDe=$("tileDe");
 const testPair=$("testPair"), testLeft=$("testLeft"), testRight=$("testRight");
 const testActions=$("testActions"), btnWrong=$("btnWrong"), btnRight=$("btnRight");
-/* Seitliche Landscape-Buttons sind weiterhin im DOM erlaubt, werden aber per CSS versteckt */
 const landActions=$("landActions"), landRight=$("landRight"), landWrong=$("landWrong");
 const boxChart=$("boxChart"), boxChartSheet=$("boxChartSheet");
 const drawerToggle=$("drawerToggle"), sheet=$("sheet"), sheetClose=$("sheetClose");
@@ -150,28 +149,45 @@ function drawPieChart(){
   });
 }
 
-/***** Schriftgröße passend machen (ohne Worttrennung) *****/
-function fitTileText(tile, minPx=16){
+/***** Schriftgröße – präzise Binärsuche (ohne Worttrennung) *****/
+function fitOneTile(tile){
   if(!tile) return;
-  tile.style.whiteSpace="normal"; tile.style.wordBreak="normal"; tile.style.hyphens="none";
-  let size=parseFloat(getComputedStyle(tile).fontSize)||28;
-  // zunächst leicht vergrößern bis knapp vor Overflow
-  for(let i=0;i<6;i++){
-    tile.style.fontSize=(size+1)+"px";
-    if(tile.scrollHeight>tile.clientHeight || tile.scrollWidth>tile.clientWidth){ tile.style.fontSize=size+"px"; break; }
-    size++;
-  }
-  // bei Overflow verkleinern
-  let guard=0;
-  while((tile.scrollHeight>tile.clientHeight || tile.scrollWidth>tile.clientWidth) && size>minPx && guard<50){
-    size--; guard++; tile.style.fontSize=size+"px";
+  tile.style.whiteSpace="normal";
+  tile.style.wordBreak="normal";
+  tile.style.hyphens="none";
+
+  // min/max dynamisch aus Containergröße ableiten
+  const minPx = 12;
+  const maxPx = Math.max(18, Math.floor(Math.min(tile.clientWidth, tile.clientHeight) * 0.35)); // konservativ
+
+  let lo=minPx, hi=maxPx, best=minPx;
+  // kleine Sicherheits-Padding berücksichtigen
+  const fits = ()=>{
+    return tile.scrollWidth <= tile.clientWidth + 1 &&
+           tile.scrollHeight <= tile.clientHeight + 1;
+  };
+
+  // Start mit hi setzen, dann binär reduzieren
+  tile.style.fontSize = hi+"px";
+  if(!fits()){
+    while(lo <= hi){
+      const mid = (lo + hi) >> 1;
+      tile.style.fontSize = mid + "px";
+      if(fits()){ best = mid; lo = mid + 1; }
+      else      { hi = mid - 1; }
+    }
+    tile.style.fontSize = best + "px";
   }
 }
+
 function fitBothTiles(){
-  fitTileText(tileEs);
-  fitTileText(tileDe);
-  fitTileText(testLeft);
-  fitTileText(testRight);
+  // requestAnimationFrame, damit Layout stabil ist
+  requestAnimationFrame(()=>{
+    fitOneTile(tileEs);
+    fitOneTile(tileDe);
+    fitOneTile(testLeft);
+    fitOneTile(testRight);
+  });
 }
 
 /***** Mode & Rendering *****/
@@ -187,10 +203,10 @@ function updateBoxBadge(){
 }
 let currentCard=null;
 function render(){
-  // immer alles zurücksetzen
+  // zurücksetzen
   testRevealed=false;
   testActions.hidden=true;
-  landActions.hidden=true; // bleibt generell versteckt (CSS), aber sicherheitshalber
+  landActions.hidden=true;
 
   directionBadge.textContent=dirText();
 
@@ -227,7 +243,7 @@ function render(){
 }
 
 /***** Interaktionen *****/
-// Lernmodus – Wischen/Tippen: 1 Aktion pro Geste (mit kurzem Lock)
+// Lernmodus – Wischen/Tippen: 1 Aktion pro Geste
 (function(){
   let startX=0,startY=0,tracking=false; const TH=40, area=learnPair;
   let lock=false; const lockit=()=>{ lock=true; setTimeout(()=>lock=false, 220); };
@@ -244,16 +260,14 @@ function render(){
   ["touchend","mouseup","mouseleave"].forEach(ev=>area.addEventListener(ev,onEnd));
 })();
 
-// Prüfen – Tap zum Reveal, dann ✅/❌ (nur unten)
+// Prüfen – Tap zeigt Antwort, dann ✅/❌ unten
 function revealAnswer(){
   if(mode!=="prüfen" || !currentCard || testRevealed) return;
   const ans=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
   testRight.textContent=ans; testRight.classList.remove("muted");
   testRevealed=true;
-  testActions.hidden=false;                 // unten einblenden
-  /* keine seitlichen Buttons mehr:
-     landActions.hidden=false;  <-- entfernt */
-  fitTileText(testRight);
+  testActions.hidden=false;  // nur unten
+  fitBothTiles();
 }
 testPair.addEventListener("click", revealAnswer);
 
@@ -290,7 +304,6 @@ function advanceWrong(){
 }
 btnRight.addEventListener("click", advanceRight);
 btnWrong.addEventListener("click", advanceWrong);
-/* Listener für seitliche Buttons können bleiben – Element ist unsichtbar */
 landRight?.addEventListener("click", advanceRight);
 landWrong?.addEventListener("click", advanceWrong);
 
@@ -428,8 +441,14 @@ saveEditBtn.addEventListener("click", ()=>{
 });
 
 /***** Größenwechsel *****/
-addEventListener("resize", ()=>{ testRevealed=false; testActions.hidden=true; landActions.hidden=true; refreshCountsUI(); });
-addEventListener("orientationchange", ()=>setTimeout(()=>{ testRevealed=false; testActions.hidden=true; landActions.hidden=true; refreshCountsUI(); },80));
+addEventListener("resize", ()=>{
+  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
+  refreshCountsUI(); fitBothTiles();
+});
+addEventListener("orientationchange", ()=>setTimeout(()=>{
+  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
+  refreshCountsUI(); fitBothTiles();
+},80));
 
 /***** Sichtbarkeit portrait/landscape anpassen *****/
 function updateLandScapeVisibility(){
