@@ -2,129 +2,120 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Vokabeltrainer</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- Chips oben (unverändert) -->
-  <header class="chips-wrap">
-    <div class="chip">⭐ <span id="pointsChip">0</span></div>
-    <div class="chip">🪜 <span id="levelChip">1</span></div>
-    <div class="chip">🔥 <span id="streakChip">0</span> d</div>
+  <!-- TOP: Chips + Modus + Bearbeiten -->
+  <header id="topbar" class="topbar">
+    <div class="chips">
+      <div class="chip"><span>⭐</span><b id="pointsChip">0</b></div>
+      <div class="chip"><span>🪜</span><b id="levelChip">1</b></div>
+      <div class="chip"><span>🔥</span><b id="streakChip">0 <small>d</small></b></div>
+    </div>
 
-    <!-- Modus & Bearbeiten (unverändert: IDs bleiben) -->
-    <button id="modeToggleBtn" class="pill mode-toggle">Lernen</button>
-    <button id="editBtn" class="pill ghost">✏️ Bearbeiten</button>
+    <div class="actions">
+      <button id="modeToggle" class="pill secondary">Lernen</button>
+      <button id="editToggle" class="pill ghost">✏️ <span data-i18n="edit">Bearbeiten</span></button>
+      <button id="drawerToggle" class="fab mini" aria-label="Werkzeuge">≡</button>
+    </div>
   </header>
 
-  <!-- STAGE: Karten + (unten) Progress/Bars -->
-  <main id="mainArea">
-    <div class="stage">
+  <!-- STAGE -->
+  <main id="app" class="app">
+    <section id="cardsArea" class="cards">
+      <div id="cardA" class="card card-a" tabindex="0"></div>
+      <div id="cardB" class="card card-b" tabindex="0"></div>
+    </section>
 
-      <!-- CARDS -->
-      <section class="cards" id="cards">
-        <article id="tileLeft" class="tile es"><div class="txt"></div></article>
-        <article id="tileRight" class="tile de"><div class="txt"></div></article>
-      </section>
+    <!-- Richtig/Falsch (eine Leiste, zentral & angehoben) -->
+    <div id="rfBar" class="rfbar" aria-hidden="true">
+      <button id="btnWrong" class="btn danger">❌ <span data-i18n="wrong">Falsch</span></button>
+      <button id="btnRight" class="btn success">✅ <span data-i18n="right">Richtig</span></button>
+    </div>
 
-      <!-- Portrait-only: Box-Balken / Fortschritt (IDs beibehalten) -->
-      <section class="progress-wrap portrait-only" id="progressWrap">
-        <div class="bars-wrap" id="boxChart"></div>
-        <div class="progress-labels">
-          <span id="progressText">Fortschritt: 0/0 (0%)</span>
-          <span id="completionText"></span>
-        </div>
-      </section>
+    <!-- Boxbadge nur Landscape -->
+    <div id="boxBadge" class="boxbadge" aria-hidden="true">B1: 0</div>
+
+    <!-- Inline-Editor (standard: versteckt) -->
+    <div id="editPanel" class="editpanel" hidden>
+      <input id="editA" type="text" autocomplete="off" inputmode="text">
+      <input id="editB" type="text" autocomplete="off" inputmode="text">
+      <div class="row">
+        <button id="saveEditBtn" class="btn success" data-i18n="save">Speichern</button>
+        <button id="cancelEditBtn" class="btn secondary" data-i18n="cancel">Abbrechen</button>
+      </div>
     </div>
   </main>
 
-  <!-- ANSWER BAR (nur Prüfen + nach Reveal sichtbar) -->
-  <div class="answer-bar" id="answerBar">
-    <button id="btnWrong" class="pill danger">❌ Falsch</button>
-    <button id="btnRight" class="pill success">✅ Richtig</button>
-  </div>
-
-  <!-- Landscape-only: oben links Modus, oben rechts Box-Badge -->
-  <button id="modeTopLeft" class="mode-top-left landscape-only">Lernen</button>
-  <span id="boxBadgeTopRight" class="badge-top-right landscape-only">B1: 0</span>
-
-  <!-- FAB Menü (unchanged) -->
-  <button id="fabMenu" class="fab">≡</button>
-
-  <!-- Bottom Sheet / Drawer (Werkzeuge) – Struktur beibehalten -->
-  <aside id="drawer" class="drawer">
+  <!-- Drawer / Werkzeuge -->
+  <aside id="drawer" class="drawer" aria-hidden="true">
     <div class="drawer-head">
-      <h2>Werkzeuge</h2>
-      <button id="drawerClose" class="ghost pill">×</button>
+      <h2 data-i18n="tools">Werkzeuge</h2>
+      <button id="drawerClose" class="pill ghost">×</button>
     </div>
 
-    <!-- Fortschritt (+7) ganz oben wie vereinbart -->
     <section class="panel">
-      <h3>Fortschritt</h3>
-      <button id="freshBtn" class="pill">+7</button>
-    </section>
-
-    <!-- UI-Sprache -->
-    <section class="panel">
-      <h3>UI-Sprache</h3>
+      <h3 data-i18n="progress">Fortschritt</h3>
       <div class="row">
-        <label for="langSelect">UI-Sprache</label>
-        <select id="langSelect">
-          <option value="de">Deutsch</option>
-          <option value="en">English</option>
-          <option value="sv">Svenska</option>
-          <option value="es">Español</option>
-        </select>
+        <button id="freshBtn" class="pill primary">+7</button>
       </div>
     </section>
 
-    <!-- Übungen / Decks (IDs unverändert) -->
     <section class="panel">
-      <h3>Übungen</h3>
+      <h3 data-i18n="uiLang">UI-Sprache</h3>
+      <select id="langSelect">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+        <option value="sv">Svenska</option>
+        <option value="es">Español</option>
+      </select>
+    </section>
+
+    <section class="panel">
+      <h3 data-i18n="decks">Übungen</h3>
       <div class="row">
-        <label for="deckSelect">Deck</label>
         <select id="deckSelect"></select>
-      </div>
-      <div class="row">
         <button id="deckAddBtn" class="pill">＋</button>
-        <button id="deckRenameBtn" class="pill ghost">✏️</button>
+        <button id="deckRenameBtn" class="pill">✏️</button>
         <button id="deckDeleteBtn" class="pill danger">🗑️</button>
       </div>
       <div class="row">
-        <input type="text" id="sideALabelInput" placeholder="A" />
-        <input type="text" id="sideBLabelInput" placeholder="B" />
-        <button id="saveLabelsBtn" class="pill success">✔︎</button>
+        <input id="sideALabel" placeholder="A">
+        <input id="sideBLabel" placeholder="B">
+        <button id="saveLabelsBtn" class="pill">✔︎</button>
       </div>
     </section>
 
-    <!-- CSV Import (wieder .csv) -->
     <section class="panel">
-      <h3>CSV Import (A,B)</h3>
-      <input type="file" id="csvFile" accept=".csv" />
-      <div class="subtle">UTF-8 / Win-1252 / ISO-8859-1; Komma oder Semikolon</div>
+      <h3>CSV</h3>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+      <small>UTF-8 / Win-1252 / ISO-8859-1; Komma/Semikolon</small>
     </section>
 
-    <!-- Richtung -->
     <section class="panel">
-      <h3>Richtung</h3>
+      <h3 data-i18n="direction">Richtung</h3>
       <button id="toggleDirectionBtn" class="pill primary">A → B</button>
     </section>
 
-    <!-- Statistik (inkl. Pie) -->
     <section class="panel">
-      <h3>Statistik</h3>
+      <h3 data-i18n="stats">Statistik</h3>
       <canvas id="pieChart" width="220" height="220"></canvas>
     </section>
 
-    <!-- Verwalten -->
     <section class="panel">
-      <h3>Verwalten</h3>
+      <h3 data-i18n="manage">Verwalten</h3>
       <div class="row">
-        <button id="deleteBtn" class="pill danger">Aktive Karte löschen</button>
-        <button id="resetProgressBtn" class="pill ghost">Nur Fortschritt</button>
-        <button id="resetAllBtn" class="pill danger">Alles löschen</button>
+        <button id="deleteBtn" class="pill danger" data-i18n="delActive">Aktive Karte löschen</button>
+        <button id="resetProgressBtn" class="pill secondary" data-i18n="resetProgress">Nur Fortschritt</button>
+        <button id="resetAllBtn" class="pill danger" data-i18n="resetAll">Alles löschen</button>
       </div>
     </section>
   </aside>
