@@ -1,6 +1,7 @@
 /* ===============================
    Vokabeltrainer – styles.css
-   (Patch: hidden-Fix, Safe-Area, Landscape)
+   (Patch: Landscape nur untere Test-Buttons,
+           seitliche Buttons weg, Safe-Area)
    =============================== */
 :root{
   --text:#111827;
@@ -145,12 +146,17 @@ input[type="text"], select{ width:100%; padding:10px 12px; border:1px solid #e5e
   }
   .badge{ background:#2563eb; color:#fff; padding:6px 10px; border-radius:12px; }
 
-  /* Test-Buttons rechts mittig, Safe-Area */
-  #landActions{
-    position:fixed; right: calc(12px + env(safe-area-inset-right));
-    top: calc(50svh - 0.5 * env(safe-area-inset-bottom));
-    transform: translateY(-50%); z-index:65;
-    display:flex; flex-direction:column; gap:10px;
+  /* ❌ Seitliche Prüf-Buttons komplett ausblenden */
+  #landActions{ display:none !important; }
+
+  /* ✅ Untere Prüf-Buttons (zentriert, über Home-Bar) */
+  #testActions{
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 24px); /* 24px über dem iOS Strich */
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: transparent;
   }
 
   /* Sheet mittig im Landscape */
