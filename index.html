@@ -2,31 +2,23 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <!-- Zoomen erlaubt -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vokabeltrainer</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- Header (Portrait & Desktop) -->
-  <header class="app-header">
-    <h1 id="appTitle">Vokabeltrainer</h1>
-    <small id="modeHint" class="mode-hint">Modus: Lernen</small>
-  </header>
-
-  <!-- Gamification (Portrait & Desktop) -->
-  <div class="gbar">
-    <div class="chip">⭐ <span id="pointsChip">0</span></div>
-    <div class="chip">🎚️ <span id="levelChip">1</span></div>
-    <div class="chip">🔥 <span id="streakChip">0</span>d</div>
-  </div>
-
-  <!-- Globale Controls (Portrait & Desktop) -->
-  <div class="controls global">
-    <button id="toggleModeBtn" class="pill secondary" type="button">Lernen</button>
-    <button id="editBtn" class="pill" type="button">✏️ Bearbeiten</button>
-    <button id="drawerToggleTop" class="pill ghost" type="button">☰ Werkzeug</button>
+  <!-- Gamification + Top Controls (Portrait & Desktop) -->
+  <div class="top">
+    <div class="gbar">
+      <div class="chip">⭐ <span id="pointsChip">0</span></div>
+      <div class="chip">🎚️ <span id="levelChip">1</span></div>
+      <div class="chip">🔥 <span id="streakChip">0</span>d</div>
+    </div>
+    <div class="controls global">
+      <button id="toggleModeBtn" class="pill secondary" type="button">Lernen</button>
+      <button id="editBtn" class="pill" type="button">✏️ Bearbeiten</button>
+    </div>
   </div>
 
   <!-- Hauptbereich -->
@@ -38,20 +30,22 @@
     </section>
 
     <!-- PRÜFEN -->
-    <section id="testPair" class="pair" aria-live="polite" hidden>
+    <section id="testPair" aria-live="polite" hidden>
       <div id="testLeft" class="tile front"></div>
       <div id="testRight" class="tile back muted"></div>
     </section>
+
+    <!-- Prüfen-Buttons -->
     <div id="testActions" class="controls test-actions" hidden>
       <button id="btnWrong" class="pill danger" type="button">❌ Falsch</button>
       <button id="btnRight" class="pill success" type="button">✅ Richtig</button>
     </div>
 
-    <!-- Box-Balken (Portrait & Desktop) -->
+    <!-- Box-Balken (nur Portrait/Desk, nicht Landscape sichtbar) -->
     <div id="boxChart" aria-label="Box-Übersicht"></div>
   </main>
 
-  <!-- Inline-Editor (öffnet per Button) -->
+  <!-- Inline-Editor -->
   <div id="editPanel" class="edit-panel" hidden>
     <input id="editA" type="text" placeholder="A">
     <input id="editB" type="text" placeholder="B">
@@ -61,113 +55,116 @@
     </div>
   </div>
 
-  <!-- Werkzeug-Drawer -->
-  <aside id="drawer" class="drawer" aria-hidden="true">
-    <button id="drawerClose" title="Schließen" aria-label="Schließen">×</button>
-    <h2 id="toolsTitle">Werkzeuge</h2>
-
-    <!-- 1) UI-Sprache -->
-    <section class="panel">
-      <h3 id="langBlockTitle">UI-Sprache</h3>
-      <div class="row">
-        <label for="langSelect" id="langLabel" class="sr-only">UI-Sprache</label>
-        <select id="langSelect">
-          <option value="de">Deutsch</option>
-          <option value="en">English</option>
-          <option value="sv">Svenska</option>
-          <option value="es">Español</option>
-        </select>
-      </div>
-    </section>
-
-    <!-- 2) Übungen -->
-    <section class="panel">
-      <h3 id="decksBlockTitle">Übungen</h3>
-      <div class="row">
-        <label for="deckSelect" id="deckLabel" class="sr-only">Deck</label>
-        <select id="deckSelect"></select>
-      </div>
-      <div class="row deck-actions">
-        <button id="deckAddBtn" class="pill ghost" type="button" title="Neue Übung">➕</button>
-        <button id="deckRenameBtn" class="pill secondary" type="button" title="Umbenennen">✏️</button>
-        <button id="deckDeleteBtn" class="pill danger" type="button" title="Löschen">🗑️</button>
-      </div>
-      <div class="row">
-        <input type="text" id="sideALabelInput" placeholder="A">
-        <input type="text" id="sideBLabelInput" placeholder="B">
-        <button id="saveLabelsBtn" class="pill" type="button">✔︎</button>
-      </div>
-    </section>
-
-    <!-- 3) CSV Import / Export -->
-    <section class="panel">
-      <h3 id="importTitle">CSV Import</h3>
-      <div class="row">
-        <input type="file" id="csvFile" accept=".csv,text/csv,.txt">
-        <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; , oder ;</small>
-      </div>
-      <div class="row">
-        <button id="exportBtn" class="pill" type="button">Exportieren</button>
-      </div>
-
-      <h4 id="addCardTitle" class="subhead">Neue Karte hinzufügen</h4>
-      <div class="row"><input type="text" id="inputSideA" placeholder="A"></div>
-      <div class="row"><input type="text" id="inputSideB" placeholder="B"></div>
-      <button id="addCardBtn" class="pill" type="button">Karte hinzufügen</button>
-    </section>
-
-    <!-- 4) Richtungswechsel -->
-    <section class="panel direction-panel">
-      <h3 id="directionBlockTitle">Abfrage-Richtung</h3>
-      <div class="row">
-        <span id="directionBadge" class="direction-badge">A → B</span>
-        <button id="toggleDirectionBtn" class="pill direction-btn" type="button">Richtung wechseln</button>
-      </div>
-    </section>
-
-    <!-- 5) Statistik -->
-    <section class="panel">
-      <h3 id="statsTitle">Statistik</h3>
-      <canvas id="pieChart" width="220" height="220"></canvas>
-      <div id="legend" class="legend"></div>
-    </section>
-
-    <!-- 6) Verwalten -->
-    <section class="panel">
-      <h3>Verwalten</h3>
-      <div class="row manage-actions">
-        <button id="deleteBtn" class="pill danger" type="button">Aktive Karte löschen</button>
-        <button id="resetProgressBtn" class="pill secondary" type="button">Nur Fortschritt löschen</button>
-        <button id="resetAllBtn" class="pill danger" type="button">Kartendeck löschen</button>
-      </div>
-    </section>
-  </aside>
-
-  <!-- Werkzeug-FAB (sichtbar in allen Ausrichtungen) -->
-  <button id="drawerToggle" title="Werkzeuge" aria-label="Werkzeuge">☰</button>
-
-  <!-- Landscape HUD (Status + ✅/❌ nach Reveal) -->
-  <div id="landHud">
-    <div id="landInfo"><span id="landInfoText">B1: 0</span></div>
-    <div class="land-actions" id="landActions" hidden>
-      <button id="landWrong" class="pill danger" type="button">❌</button>
-      <button id="landRight" class="pill success" type="button">✅</button>
-    </div>
+  <!-- Landscape HUD -->
+  <div id="landHUD">
+    <button id="landModeToggle" class="pill secondary small" type="button">Lernen</button>
+    <div id="landBoxBadge" class="badge">B1: 0</div>
   </div>
 
-  <!-- Bottom-Sheet im Querformat, öffnet per sichtbarem Button (⋯) unten mittig -->
+  <!-- Test-Buttons im Landscape rechts -->
+  <div id="landActions" class="land-actions" hidden>
+    <button id="landWrong" class="pill danger" type="button">❌</button>
+    <button id="landRight" class="pill success" type="button">✅</button>
+  </div>
+
+  <!-- Werkzeug FAB -->
+  <button id="drawerToggle" title="Werkzeuge" aria-label="Werkzeuge">☰</button>
+
+  <!-- Bottom-Sheet: Werkzeuge -->
   <div id="sheet" aria-hidden="true">
-    <button id="sheetOpen" aria-label="Mehr">⋯</button>
+    <div id="sheetHeader">
+      <div class="drag-handle"></div>
+      <h2>Werkzeuge</h2>
+      <button id="sheetClose" aria-label="Schließen">×</button>
+    </div>
     <div id="sheetContent">
-      <div class="sheet-row">
-        <button id="freshBtn" class="pill fresh" type="button">+7</button>
-        <button id="landModeToggle" class="pill swap" type="button">Lernen</button>
-      </div>
-      <div id="boxChartSheet"></div>
+      <!-- 0) Balken + +7 -->
+      <section class="panel">
+        <h3>Fortschritt</h3>
+        <div id="boxChartSheet"></div>
+        <div class="row">
+          <button id="freshBtn" class="pill fresh" type="button">+7</button>
+        </div>
+      </section>
+
+      <!-- 1) UI-Sprache -->
+      <section class="panel">
+        <h3>UI-Sprache</h3>
+        <div class="row">
+          <label for="langSelect" class="sr-only">UI-Sprache</label>
+          <select id="langSelect">
+            <option value="de">Deutsch</option>
+            <option value="en">English</option>
+            <option value="sv">Svenska</option>
+            <option value="es">Español</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- 2) Übungen -->
+      <section class="panel">
+        <h3>Übungen</h3>
+        <div class="row">
+          <label for="deckSelect" class="sr-only">Deck</label>
+          <select id="deckSelect"></select>
+        </div>
+        <div class="row deck-actions">
+          <button id="deckAddBtn" class="pill ghost" type="button" title="Neue Übung">➕</button>
+          <button id="deckRenameBtn" class="pill secondary" type="button" title="Umbenennen">✏️</button>
+          <button id="deckDeleteBtn" class="pill danger" type="button" title="Löschen">🗑️</button>
+        </div>
+        <div class="row">
+          <input type="text" id="sideALabelInput" placeholder="A">
+          <input type="text" id="sideBLabelInput" placeholder="B">
+          <button id="saveLabelsBtn" class="pill" type="button">✔︎</button>
+        </div>
+      </section>
+
+      <!-- 3) CSV Import / Export -->
+      <section class="panel">
+        <h3>CSV Import</h3>
+        <div class="row">
+          <input type="file" id="csvFile" accept=".csv,text/csv,.txt">
+          <small class="muted">UTF-8 / Win-1252 / ISO-8859-1; , oder ;</small>
+        </div>
+        <div class="row">
+          <button id="exportBtn" class="pill" type="button">Exportieren</button>
+        </div>
+
+        <h4 class="subhead">Neue Karte</h4>
+        <div class="row"><input type="text" id="inputSideA" placeholder="A"></div>
+        <div class="row"><input type="text" id="inputSideB" placeholder="B"></div>
+        <button id="addCardBtn" class="pill" type="button">Karte hinzufügen</button>
+      </section>
+
+      <!-- 4) Richtung -->
+      <section class="panel direction-panel">
+        <h3>Abfrage-Richtung</h3>
+        <div class="row">
+          <span id="directionBadge" class="direction-badge">A → B</span>
+          <button id="toggleDirectionBtn" class="pill direction-btn" type="button">Richtung wechseln</button>
+        </div>
+      </section>
+
+      <!-- 5) Statistik -->
+      <section class="panel">
+        <h3>Statistik</h3>
+        <canvas id="pieChart" width="220" height="220"></canvas>
+        <div id="legend" class="legend"></div>
+      </section>
+
+      <!-- 6) Verwalten -->
+      <section class="panel">
+        <h3>Verwalten</h3>
+        <div class="row manage-actions">
+          <button id="deleteBtn" class="pill danger" type="button">Aktive Karte löschen</button>
+          <button id="resetProgressBtn" class="pill secondary" type="button">Nur Fortschritt löschen</button>
+          <button id="resetAllBtn" class="pill danger" type="button">Kartendeck löschen</button>
+        </div>
+      </section>
     </div>
   </div>
 
   <script src="app.js"></script>
 </body>
 </html>
-
