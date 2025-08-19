@@ -151,21 +151,27 @@ function drawPieChart(){
 
 /***** Schriftgröße passend machen (ohne Worttrennung) *****/
 function fitTileText(tile, minPx=16){
+  if(!tile) return;
   tile.style.whiteSpace="normal"; tile.style.wordBreak="normal"; tile.style.hyphens="none";
   let size=parseFloat(getComputedStyle(tile).fontSize)||28;
-  // zuerst vergrößern bis knapp vor Overflow
+  // zunächst leicht vergrößern bis knapp vor Overflow
   for(let i=0;i<6;i++){
     tile.style.fontSize=(size+1)+"px";
     if(tile.scrollHeight>tile.clientHeight || tile.scrollWidth>tile.clientWidth){ tile.style.fontSize=size+"px"; break; }
     size++;
   }
-  // wenn Overflow: verkleinern
+  // bei Overflow verkleinern
   let guard=0;
   while((tile.scrollHeight>tile.clientHeight || tile.scrollWidth>tile.clientWidth) && size>minPx && guard<50){
     size--; guard++; tile.style.fontSize=size+"px";
   }
 }
-function fitBothTiles(){ fitTileText(tileEs); fitTileText(tileDe); fitTileText(testLeft); fitTileText(testRight); }
+function fitBothTiles(){
+  fitTileText(tileEs);
+  fitTileText(tileDe);
+  fitTileText(testLeft);
+  fitTileText(testRight);
+}
 
 /***** Mode & Rendering *****/
 function dirText(){ const d=currentDeck(); const A=d?.sideALabel||"A", B=d?.sideBLabel||"B"; return (direction==="a2b")?`${A} → ${B}`:`${B} → ${A}`; }
@@ -180,22 +186,36 @@ function updateBoxBadge(){
 }
 let currentCard=null;
 function render(){
-  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
+  // immer alles zurücksetzen (Fix für Doppelanzeige)
+  testRevealed=false;
+  testActions.hidden=true;
+  landActions.hidden=true;
+
   directionBadge.textContent=dirText();
 
   if(mode==="lernen"){
-    learnPair.hidden=false; testPair.hidden=true;
+    learnPair.hidden = false;
+    testPair.hidden  = true;
+
     const b1=activeCards.filter(c=>c.box===1);
-    if(!b1.length){ tileEs.textContent=t().noCards; tileDe.textContent=""; currentCard=null; fitBothTiles(); return; }
+    if(!b1.length){
+      tileEs.textContent=t().noCards; tileDe.textContent=""; currentCard=null; fitBothTiles();
+      updateModeButtons(); updateBoxBadge(); return;
+    }
     const idx=((learnIndex<0?0:learnIndex) % b1.length);
     currentCard=b1[idx];
     tileEs.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     tileDe.textContent=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
     fitBothTiles();
   }else{
-    learnPair.hidden=true; testPair.hidden=false;
+    learnPair.hidden = true;
+    testPair.hidden  = false;
+
     const bx=activeCards.filter(c=>c.box===currentTestBox);
-    if(!bx.length){ testLeft.textContent=t().noCards; testRight.textContent=""; currentCard=null; fitBothTiles(); return; }
+    if(!bx.length){
+      testLeft.textContent=t().noCards; testRight.textContent=""; currentCard=null; fitBothTiles();
+      updateModeButtons(); updateBoxBadge(); return;
+    }
     currentCard=bx[Math.floor(Math.random()*bx.length)];
     testLeft.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     testRight.textContent=""; testRight.classList.add("muted");
@@ -206,7 +226,7 @@ function render(){
 }
 
 /***** Interaktionen *****/
-// Lernmodus – Wischen/Tippen: 1 Aktion pro Geste
+// Lernmodus – Wischen/Tippen: 1 Aktion pro Geste (mit kurzem Lock)
 (function(){
   let startX=0,startY=0,tracking=false; const TH=40, area=learnPair;
   let lock=false; const lockit=()=>{ lock=true; setTimeout(()=>lock=false, 220); };
@@ -269,7 +289,14 @@ landRight.addEventListener("click", advanceRight);
 landWrong.addEventListener("click", advanceWrong);
 
 /***** Mode Toggle *****/
-function toggleMode(){ mode=(mode==="lernen")?"prüfen":"lernen"; testRevealed=false; testActions.hidden=true; landActions.hidden=true; render(); refreshCountsUI(); }
+function toggleMode(){
+  mode=(mode==="lernen")?"prüfen":"lernen";
+  // sicherstellen, dass jeweils genau EINE Section sichtbar ist
+  learnPair.hidden = (mode!=="lernen");
+  testPair.hidden  = (mode!=="prüfen");
+  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
+  render(); refreshCountsUI();
+}
 toggleModeBtn.addEventListener("click", toggleMode);
 landModeToggle.addEventListener("click", toggleMode);
 
@@ -399,10 +426,9 @@ saveEditBtn.addEventListener("click", ()=>{
 addEventListener("resize", ()=>{ testRevealed=false; testActions.hidden=true; landActions.hidden=true; refreshCountsUI(); });
 addEventListener("orientationchange", ()=>setTimeout(()=>{ testRevealed=false; testActions.hidden=true; landActions.hidden=true; refreshCountsUI(); },80));
 
-/***** Init *****/
+/***** Sichtbarkeit portrait/landscape anpassen *****/
 function updateLandScapeVisibility(){
   const isLand = matchMedia("(orientation:landscape)").matches && matchMedia("(pointer:coarse)").matches;
-  // Box-Chart im Portrait sichtbar, im Landscape im Sheet
   boxChart.style.display = isLand ? "none" : "flex";
 }
 function refreshCountsUI(){
@@ -414,6 +440,8 @@ function refreshCountsUI(){
   }
   updateLandScapeVisibility();
 }
+
+/***** Init *****/
 function init(){
   rebuildDeckSelect();
   const added=fillBox1(20); if(added>0){ mode="lernen"; const b1=activeCards.filter(c=>c.box===1).length; learnIndex=Math.max(0,b1-added); }
@@ -421,3 +449,4 @@ function init(){
   render(); refreshCountsUI();
 }
 init();
+
