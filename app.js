@@ -150,45 +150,47 @@ function drawPieChart(){
 }
 
 /***** Schriftgröße – präzise Binärsuche (ohne Worttrennung) *****/
+// *** CHANGED: komplett neue Fitting-Routine ***
 function fitOneTile(tile){
   if(!tile) return;
-  tile.style.whiteSpace="normal";
-  tile.style.wordBreak="normal";
-  tile.style.hyphens="none";
 
-  // min/max dynamisch aus Containergröße ableiten
-  const minPx = 12;
-  const maxPx = Math.max(18, Math.floor(Math.min(tile.clientWidth, tile.clientHeight) * 0.35)); // konservativ
+  tile.style.whiteSpace = "normal";
+  tile.style.wordBreak  = "normal";
+  tile.style.hyphens    = "none";
+  tile.style.overflow   = "hidden";
 
-  let lo=minPx, hi=maxPx, best=minPx;
-  // kleine Sicherheits-Padding berücksichtigen
-  const fits = ()=>{
-    return tile.scrollWidth <= tile.clientWidth + 1 &&
-           tile.scrollHeight <= tile.clientHeight + 1;
-  };
+  const rect = tile.getBoundingClientRect();
+  const availW = Math.max(0, rect.width  - 2);
+  const availH = Math.max(0, rect.height - 2);
 
-  // Start mit hi setzen, dann binär reduzieren
-  tile.style.fontSize = hi+"px";
-  if(!fits()){
-    while(lo <= hi){
+  const base = Math.min(availW, availH);
+  const MIN = 12;
+  const MAX = Math.max(18, Math.floor(base * 0.34)); // konservativ
+
+  let lo = MIN, hi = MAX, best = MIN;
+
+  const fits = () =>
+    tile.scrollWidth  <= availW + 0.5 &&
+    tile.scrollHeight <= availH + 0.5;
+
+  tile.style.fontSize = hi + "px";
+  if (!fits()){
+    while (lo <= hi){
       const mid = (lo + hi) >> 1;
       tile.style.fontSize = mid + "px";
-      if(fits()){ best = mid; lo = mid + 1; }
-      else      { hi = mid - 1; }
+      if (fits()) { best = mid; lo = mid + 1; }
+      else        { hi  = mid - 1; }
     }
     tile.style.fontSize = best + "px";
   }
 }
 
 function fitBothTiles(){
-  // requestAnimationFrame, damit Layout stabil ist
   requestAnimationFrame(()=>{
-    fitOneTile(tileEs);
-    fitOneTile(tileDe);
-    fitOneTile(testLeft);
-    fitOneTile(testRight);
+    [tileEs,tileDe,testLeft,testRight].forEach(fitOneTile);
   });
 }
+// *** CHANGED end ***
 
 /***** Mode & Rendering *****/
 function dirText(){ const d=currentDeck(); const A=d?.sideALabel||"A", B=d?.sideBLabel||"B"; return (direction==="a2b")?`${A} → ${B}`:`${B} → ${A}`; }
@@ -202,8 +204,9 @@ function updateBoxBadge(){
   landBoxBadge.textContent=`B${currentTestBox}: ${count}`;
 }
 let currentCard=null;
-function render(){
-  // zurücksetzen
+
+// Originales Render behalten …
+function _renderCore(){
   testRevealed=false;
   testActions.hidden=true;
   landActions.hidden=true;
@@ -216,31 +219,36 @@ function render(){
 
     const b1=activeCards.filter(c=>c.box===1);
     if(!b1.length){
-      tileEs.textContent=t().noCards; tileDe.textContent=""; currentCard=null; fitBothTiles();
+      tileEs.textContent=t().noCards; tileDe.textContent=""; currentCard=null;
       updateModeButtons(); updateBoxBadge(); return;
     }
     const idx=((learnIndex<0?0:learnIndex) % b1.length);
     currentCard=b1[idx];
     tileEs.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     tileDe.textContent=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
-    fitBothTiles();
   }else{
     learnPair.hidden = true;
     testPair.hidden  = false;
 
     const bx=activeCards.filter(c=>c.box===currentTestBox);
     if(!bx.length){
-      testLeft.textContent=t().noCards; testRight.textContent=""; currentCard=null; fitBothTiles();
+      testLeft.textContent=t().noCards; testRight.textContent=""; currentCard=null;
       updateModeButtons(); updateBoxBadge(); return;
     }
     currentCard=bx[Math.floor(Math.random()*bx.length)];
     testLeft.textContent=(direction==="a2b")?currentCard.sideA:currentCard.sideB;
     testRight.textContent=""; testRight.classList.add("muted");
     testPair.classList.remove("out-up","out-down"); testPair.classList.add("in-fade");
-    fitBothTiles();
   }
   updateModeButtons(); updateBoxBadge(); updateGamification();
 }
+
+// *** CHANGED: render um fit ergänzt ***
+function render(){
+  _renderCore();
+  fitBothTiles();
+}
+// *** CHANGED end ***
 
 /***** Interaktionen *****/
 // Lernmodus – Wischen/Tippen: 1 Aktion pro Geste
@@ -253,8 +261,7 @@ function render(){
     const t=e.changedTouches?e.changedTouches[0]:e;
     const dx=t.clientX-startX, dy=t.clientY-startY; if(Math.abs(dy)>60) return;
     if(dx<-TH){ learnIndex++; } else if(dx>TH){ learnIndex=Math.max(0,learnIndex-1); } else { learnIndex++; }
-    markActivity(1); render();
-    lockit();
+    markActivity(1); render(); lockit();
   }
   ["touchstart","mousedown"].forEach(ev=>area.addEventListener(ev,onStart,{passive:true}));
   ["touchend","mouseup","mouseleave"].forEach(ev=>area.addEventListener(ev,onEnd));
@@ -266,7 +273,7 @@ function revealAnswer(){
   const ans=(direction==="a2b")?currentCard.sideB:currentCard.sideA;
   testRight.textContent=ans; testRight.classList.remove("muted");
   testRevealed=true;
-  testActions.hidden=false;  // nur unten
+  testActions.hidden=false;
   fitBothTiles();
 }
 testPair.addEventListener("click", revealAnswer);
@@ -321,8 +328,16 @@ landModeToggle.addEventListener("click", toggleMode);
 /***** FAB / Bottom-Sheet *****/
 function openSheet(){ sheet.classList.add("open"); sheet.setAttribute("aria-hidden","false"); }
 function closeSheet(){ sheet.classList.remove("open"); sheet.setAttribute("aria-hidden","true"); }
-drawerToggle.addEventListener("click", openSheet);
-sheetClose.addEventListener("click", closeSheet);
+drawerToggle.addEventListener("click", ()=>{
+  openSheet();
+  // *** CHANGED: nach Öffnen refitten ***
+  requestAnimationFrame(fitBothTiles);
+});
+sheetClose.addEventListener("click", ()=>{
+  closeSheet();
+  // *** CHANGED: nach Schließen refitten ***
+  requestAnimationFrame(fitBothTiles);
+});
 
 /***** +7 *****/
 freshBtn.addEventListener("click", ()=>{
@@ -432,23 +447,28 @@ editBtn.addEventListener("click", ()=>{
   if(!currentCard){ alert("Keine Karte aktiv."); return; }
   const d=currentDeck(); editA.placeholder=d?.sideALabel||"A"; editB.placeholder=d?.sideBLabel||"B";
   editA.value=currentCard.sideA||""; editB.value=currentCard.sideB||"";
-  editPanel.hidden=false; editA.focus();
+  editPanel.classList.add("show");
+  editA.focus();
 });
-cancelEditBtn.addEventListener("click", ()=> editPanel.hidden=true );
+cancelEditBtn.addEventListener("click", ()=> editPanel.classList.remove("show") );
 saveEditBtn.addEventListener("click", ()=>{
   if(!currentCard) return; const A=editA.value.trim(), B=editB.value.trim(); if(!A||!B) return;
-  currentCard.sideA=A; currentCard.sideB=B; saveData(); editPanel.hidden=true; render();
+  currentCard.sideA=A; currentCard.sideB=B; saveData(); editPanel.classList.remove("show"); render();
 });
 
 /***** Größenwechsel *****/
+// *** CHANGED: Reihenfolge (erst UI, dann Fit) ***
 addEventListener("resize", ()=>{
-  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
-  refreshCountsUI(); fitBothTiles();
+  refreshCountsUI();
+  fitBothTiles();
 });
-addEventListener("orientationchange", ()=>setTimeout(()=>{
-  testRevealed=false; testActions.hidden=true; landActions.hidden=true;
-  refreshCountsUI(); fitBothTiles();
-},80));
+addEventListener("orientationchange", ()=>{
+  setTimeout(()=>{
+    refreshCountsUI();
+    fitBothTiles();
+  }, 80);
+});
+// *** CHANGED end ***
 
 /***** Sichtbarkeit portrait/landscape anpassen *****/
 function updateLandScapeVisibility(){
