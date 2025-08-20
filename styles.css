@@ -48,24 +48,15 @@ body{
   display:grid;
   grid-template-columns: 1fr;
   gap:14px;
-  align-items:center;
-  justify-content:center;
+  align-items:center; justify-content:center;
   height:100%;
-  touch-action: pan-y; /* horizontale Gesten erlauben, vertikale Scrolls durchreichen */
+  touch-action: pan-y;
 }
 .card{
-  background:#fff;
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  padding:18px;
-  display:flex; align-items:center; justify-content:center;
-  text-align:center;
-  width:100%;
-  height:45%;
-  overflow:hidden;
-  user-select:none;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:18px; display:flex; align-items:center; justify-content:center;
+  text-align:center; width:100%; height:45%; overflow:hidden; user-select:none;
+  word-break: keep-all; overflow-wrap: anywhere;
 }
 .card-a{ background:#dbeafe; }
 .card-b{ background:#fef3c7; }
@@ -77,11 +68,9 @@ body{
 
 /* RF-Bar */
 .rfbar{
-  position:fixed;
-  left:50%; transform:translateX(-50%);
-  bottom: calc(8px + var(--safe-bottom) + 10px); /* leicht angehoben */
-  display:flex; gap:10px;
-  z-index:25;
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom: calc(8px + var(--safe-bottom) + 10px);
+  display:flex; gap:10px; z-index:25;
 }
 .btn{ border:0; border-radius:999px; padding:10px 16px; font-size:16px; }
 .success{ background:#176427; color:#fff; }
@@ -98,10 +87,8 @@ body{
 
 /* Editor */
 .editpanel{
-  position:fixed;
-  left:50%; transform:translateX(-50%);
-  bottom: calc(64px + var(--safe-bottom));
-  z-index:26;
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom: calc(64px + var(--safe-bottom)); z-index:26;
   background:#fff; padding:12px; border-radius:16px; box-shadow:var(--shadow);
   width:min(92vw, 680px);
 }
@@ -122,13 +109,17 @@ body{
 .panel .row{ margin-top:8px; }
 .panel input, .panel select{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid #e5e7eb; }
 
-/* NEU: Boxbars */
+/* Boxbars */
 .boxbars{ display:flex; align-items:flex-end; gap:6px; height:110px; padding:8px; background:#f3f4f6; border-radius:12px; }
-.boxbar{
-  flex:1; min-width:0; height:10px; background:#bfd3ff; border-radius:6px; position:relative; cursor:pointer;
-}
+.boxbar{ flex:1; height:10px; background:#bfd3ff; border-radius:6px; position:relative; cursor:pointer; }
 .boxbar > span{
   position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
   font-size:12px; color:#374151; margin-bottom:4px;
 }
 .boxbar.active{ outline:2px solid var(--brand); }
+
+/* Import-Liste */
+.imports-list{ list-style:none; margin:0; padding:0; }
+.imports-list li{ font-size:13px; padding:6px 0; border-bottom:1px solid #eef2f7; }
+.imports-list li small{ color:#6b7280; display:block; }
+
