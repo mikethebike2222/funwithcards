@@ -1,4 +1,4 @@
-const CACHE_NAME = 'funwithcards-v15';
+const CACHE_NAME = 'funwithcards-v16';
 const ASSETS = [
   './',
   './index.html',
