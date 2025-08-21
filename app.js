@@ -9,7 +9,7 @@ addEventListener('orientationchange', ()=>{ setVH(); queueLayout(); });
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ setVH(); queueLayout(); }});
 
 /* ====== Persistenter State ====== */
-const LS_DECKS="leitnerDecks";
+const LS_DECKS="leitnerDeckS";
 let decks = JSON.parse(localStorage.getItem(LS_DECKS)||"[]");
 if(decks.length===0){
   const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
@@ -128,7 +128,10 @@ function fitText(el, min=16, max=72){
 function setRF(show){
   rfBar.style.display = show ? 'flex' : 'none';
   rfBar.setAttribute('aria-hidden', show ? 'false' : 'true');
+  // NEW: Platz unter den Karten schaffen, wenn RF sichtbar (nur Portrait)
+  document.body.classList.toggle('rf-on', !!show);
 }
+
 
 /* ====== Render ====== */
 let currentIndex = 0;
