@@ -76,6 +76,16 @@ body{
 .success{ background:#176427; color:#fff; }
 .danger{ background:#8f1b2b; color:#fff; }
 
+/* NEW: rf-on – im Hochformat Platz für RF-Leiste schaffen */
+@media (orientation:portrait){
+  body.rf-on .app{
+    padding-bottom: calc(14px + var(--safe-bottom) + 78px); /* Platz unterhalb */
+  }
+  body.rf-on .cards .card{
+    height:42%; /* etwas kleiner, damit nichts überlappt */
+  }
+}
+
 /* Boxbadge Landscape */
 .boxbadge{
   position:fixed;
