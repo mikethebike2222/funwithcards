@@ -1,501 +1,620 @@
-/* ====== Viewport Fix ====== */
-function setVH(){
-  const vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--vh', `${vh}px`);
-}
-setVH();
-addEventListener('resize', setVH);
-addEventListener('orientationchange', ()=>{ setVH(); queueLayout(); });
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ setVH(); queueLayout(); }});
+/* =========================
+   Vokabeltrainer – index.js
+   ========================= */
 
-/* ====== Persistenter State ====== */
-const LS_DECKS="leitnerDeckS";
-let decks = JSON.parse(localStorage.getItem(LS_DECKS)||"[]");
-if(decks.length===0){
-  const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-  decks = [{id,name:"Spanisch ES→DE", sideA:"ES", sideB:"DE"}];
+/* ---------- Persistenz-Schlüssel ---------- */
+const LS_DECKS = "leitnerDecks";
+const LS_CURR_DECK = "leitnerCurrentDeck";
+const LS_UI_LANG = "uiLang";
+
+/* ---------- Globaler State ---------- */
+let decks = JSON.parse(localStorage.getItem(LS_DECKS) || "[]");
+if (decks.length === 0) {
+  const id = crypto.randomUUID();
+  decks = [{ id, name: "Default", sideALabel: "A", sideBLabel: "B", importedFiles: [] }];
   localStorage.setItem(LS_DECKS, JSON.stringify(decks));
 }
-let currentDeckId = localStorage.getItem("leitnerCurrentDeck") || decks[0].id;
-function deckKey(k){ return `${k}_${currentDeckId}`; }
-
-let activeCards  = JSON.parse(localStorage.getItem(deckKey("cards"))   || "[]");
+let currentDeckId = localStorage.getItem(LS_CURR_DECK) || decks[0].id;
+let activeCards = JSON.parse(localStorage.getItem(deckKey("cards")) || "[]");    // {sideA, sideB, box}
 let reserveCards = JSON.parse(localStorage.getItem(deckKey("reserve")) || "[]");
 let learnedCards = JSON.parse(localStorage.getItem(deckKey("learned")) || "[]");
-let importsLog   = JSON.parse(localStorage.getItem(deckKey("imports")) || "[]");
+let uiLang = localStorage.getItem(LS_UI_LANG) || "de";
 
-let direction = localStorage.getItem(deckKey("direction")) || "a2b";
-let mode = localStorage.getItem(deckKey("mode")) || "lernen"; // lernen|prüfen
-let currentTestBox = parseInt(localStorage.getItem(deckKey("box"))||"1",10);
-let showAnswer = false;
-let editOpen = false;
+let mode = "lernen";            // "lernen" | "prüfen"
+let direction = "a2b";          // "a2b" | "b2a"
+let currentTestBox = 1;         // 1..5
+let learnIndex = 0;             // Zeiger in Box 1
+let revealed = false;           // Karte im Prüfen aufgedeckt?
 const batchSizeFresh = 7;
 
-/* ====== DOM ====== */
-const chipPoints = qs("#pointsChip");
-const chipLevel  = qs("#levelChip");
-const chipStreak = qs("#streakChip");
+/* ---------- DOM-Referenzen ---------- */
+const btnMode = document.getElementById("btnMode");
+const btnEdit = document.getElementById("btnEdit");
+const drawerToggle = document.getElementById("drawerToggle");
 
-const modeToggle = qs("#modeToggle");
-const editToggle = qs("#editToggle");
+const tileEs = document.getElementById("tileEs");
+const tileDe = document.getElementById("tileDe");
 
-const cardsArea = qs("#cardsArea");
-const cardA = qs("#cardA");
-const cardB = qs("#cardB");
+const btnRight = document.getElementById("btnRight");
+const btnWrong = document.getElementById("btnWrong");
 
-const rfBar = qs("#rfBar");
-const btnRight = qs("#btnRight");
-const btnWrong = qs("#btnWrong");
+const boxChart = document.getElementById("boxChart");
+const pieChartCanvas = document.getElementById("pieChart");
+const boxBadge = document.getElementById("boxBadge"); // optional (Landscape)
 
-const editPanel = qs("#editPanel");
-const editA = qs("#editA");
-const editB = qs("#editB");
-const saveEditBtn = qs("#saveEditBtn");
-const cancelEditBtn = qs("#cancelEditBtn");
+const langSelect = document.getElementById("langSelect");
+const deckSelect = document.getElementById("deckSelect");
+const btnFresh = document.getElementById("btnFresh");
 
-const drawer = qs("#drawer");
-qs("#drawerToggle").onclick = ()=> drawer.setAttribute("aria-hidden","false");
-qs("#drawerClose").onclick  = ()=> drawer.setAttribute("aria-hidden","true");
+const inputSideA = document.getElementById("inputSideA");
+const inputSideB = document.getElementById("inputSideB");
+const btnSaveLabels = document.getElementById("btnSaveLabels");
 
-const freshBtn = qs("#freshBtn");
-const boxBadge = qs("#boxBadge");
+const importCsv = document.getElementById("importCsv");
+const importList = document.getElementById("importList");
+const btnExport = document.getElementById("btnExport");
 
-/* Werkzeuge */
-const deckSelect = qs("#deckSelect");
-const deckAddBtn = qs("#deckAddBtn");
-const deckRenameBtn = qs("#deckRenameBtn");
-const deckDeleteBtn = qs("#deckDeleteBtn");
-const sideALabel = qs("#sideALabel");
-const sideBLabel = qs("#sideBLabel");
-const saveLabelsBtn = qs("#saveLabelsBtn");
-const langSelect = qs("#langSelect");
-const toggleDirectionBtn = qs("#toggleDirectionBtn");
-const csvFile = qs("#csvFile");
-const pie = qs("#pieChart").getContext("2d");
+const directionBadge = document.getElementById("directionBadge");
+const toggleDirectionBtn = document.getElementById("toggleDirectionBtn");
 
-/* Boxbars & Importliste */
-const boxBars = qs("#boxBars");
-const importsList = qs("#importsList");
-
-/* ====== I18N ====== */
-const i18n = {
-  de:{ edit:"Bearbeiten", wrong:"Falsch", right:"Richtig", tools:"Werkzeuge", progress:"Fortschritt", uiLang:"UI-Sprache", decks:"Übungen", direction:"Richtung", stats:"Statistik", manage:"Verwalten", delActive:"Aktive Karte löschen", resetProgress:"Nur Fortschritt", resetAll:"Alles löschen", save:"Speichern", cancel:"Abbrechen" },
-  en:{ edit:"Edit", wrong:"Wrong", right:"Right", tools:"Tools", progress:"Progress", uiLang:"UI language", decks:"Decks", direction:"Direction", stats:"Stats", manage:"Manage", delActive:"Delete active card", resetProgress:"Progress only", resetAll:"Delete all", save:"Save", cancel:"Cancel" },
-  sv:{ edit:"Redigera", wrong:"Fel", right:"Rätt", tools:"Verktyg", progress:"Framsteg", uiLang:"UI-språk", decks:"Övningar", direction:"Riktning", stats:"Statistik", manage:"Hantera", delActive:"Radera aktivt kort", resetProgress:"Endast framsteg", resetAll:"Radera allt", save:"Spara", cancel:"Avbryt" },
-  es:{ edit:"Editar", wrong:"Mal", right:"Bien", tools:"Herramientas", progress:"Progreso", uiLang:"Idioma UI", decks:"Barajas", direction:"Dirección", stats:"Estadísticas", manage:"Gestionar", delActive:"Eliminar tarjeta activa", resetProgress:"Solo progreso", resetAll:"Borrar todo", save:"Guardar", cancel:"Cancelar" },
+/* ---------- i18n ---------- */
+const I18N = {
+  de: {
+    modeLearn: "Lernen",
+    modeTest: "Prüfen",
+    edit: "Bearbeiten",
+    menu: "Werkzeug",
+    right: "Richtig",
+    wrong: "Falsch",
+    fresh: "+7",
+    stats: "Statistik",
+    progress: "Fortschritt",
+    uiLanguage: "UI-Sprache",
+    decks: "Übungen",
+    deck: "Deck",
+    add: "Neu",
+    rename: "Umbenennen",
+    remove: "Löschen",
+    sideA: "A",
+    sideB: "B",
+    save: "Speichern",
+    cancel: "Abbrechen",
+    import: "CSV-Import",
+    export: "Exportieren",
+    direction: "Richtung",
+    a2b: "A → B",
+    b2a: "B → A",
+    manage: "Verwalten",
+    delActiveCard: "Aktive Karte löschen",
+    resetProgress: "Nur Fortschritt löschen",
+    delDeckAndProgress: "Kartendeck aus Übung löschen",
+    box: "Box",
+    none: "Keine Karten",
+    points: "Punkte",
+    level: "Level",
+    streakDays: "d",
+  },
+  en: {
+    modeLearn: "Learn",
+    modeTest: "Test",
+    edit: "Edit",
+    menu: "Tools",
+    right: "Right",
+    wrong: "Wrong",
+    fresh: "+7",
+    stats: "Statistics",
+    progress: "Progress",
+    uiLanguage: "UI language",
+    decks: "Exercises",
+    deck: "Deck",
+    add: "New",
+    rename: "Rename",
+    remove: "Delete",
+    sideA: "A",
+    sideB: "B",
+    save: "Save",
+    cancel: "Cancel",
+    import: "CSV import",
+    export: "Export",
+    direction: "Direction",
+    a2b: "A → B",
+    b2a: "B → A",
+    manage: "Manage",
+    delActiveCard: "Delete active card",
+    resetProgress: "Reset progress only",
+    delDeckAndProgress: "Remove deck from exercise",
+    box: "Box",
+    none: "No cards",
+    points: "Points",
+    level: "Level",
+    streakDays: "d",
+  },
+  sv: {
+    modeLearn: "Lära",
+    modeTest: "Testa",
+    edit: "Redigera",
+    menu: "Verktyg",
+    right: "Rätt",
+    wrong: "Fel",
+    fresh: "+7",
+    stats: "Statistik",
+    progress: "Framsteg",
+    uiLanguage: "UI-språk",
+    decks: "Övningar",
+    deck: "Kortlek",
+    add: "Ny",
+    rename: "Byt namn",
+    remove: "Radera",
+    sideA: "A",
+    sideB: "B",
+    save: "Spara",
+    cancel: "Avbryt",
+    import: "CSV-import",
+    export: "Exportera",
+    direction: "Riktning",
+    a2b: "A → B",
+    b2a: "B → A",
+    manage: "Hantera",
+    delActiveCard: "Ta bort aktivt kort",
+    resetProgress: "Återställ bara framsteg",
+    delDeckAndProgress: "Ta bort lek från övning",
+    box: "Box",
+    none: "Inga kort",
+    points: "Poäng",
+    level: "Nivå",
+    streakDays: "d",
+  },
+  es: {
+    modeLearn: "Aprender",
+    modeTest: "Repasar",
+    edit: "Editar",
+    menu: "Herramientas",
+    right: "Correcto",
+    wrong: "Incorrecto",
+    fresh: "+7",
+    stats: "Estadísticas",
+    progress: "Progreso",
+    uiLanguage: "Idioma de la UI",
+    decks: "Ejercicios",
+    deck: "Mazo",
+    add: "Nuevo",
+    rename: "Renombrar",
+    remove: "Eliminar",
+    sideA: "A",
+    sideB: "B",
+    save: "Guardar",
+    cancel: "Cancelar",
+    import: "Importar CSV",
+    export: "Exportar",
+    direction: "Dirección",
+    a2b: "A → B",
+    b2a: "B → A",
+    manage: "Administrar",
+    delActiveCard: "Eliminar carta actual",
+    resetProgress: "Reiniciar progreso",
+    delDeckAndProgress: "Quitar mazo del ejercicio",
+    box: "Caja",
+    none: "Sin cartas",
+    points: "Puntos",
+    level: "Nivel",
+    streakDays: "d",
+  },
 };
-let uiLang = localStorage.getItem("uiLang") || "de";
-function applyI18n(){
-  document.querySelectorAll("[data-i18n]").forEach(el=>{
-    const k = el.getAttribute("data-i18n");
-    el.textContent = (i18n[uiLang] && i18n[uiLang][k]) || el.textContent;
-  });
-  modeToggle.textContent = mode==="lernen" ? "Lernen" : "Prüfen";
-  editToggle.innerHTML = `✏️ ${i18n[uiLang].edit}`;
+function t(key) {
+  const pack = I18N[uiLang] || I18N.de;
+  return pack[key] ?? key;
 }
-applyI18n();
 
-/* ====== Helpers ====== */
-function qs(s){ return document.querySelector(s); }
-function save(){
+/* ---------- Helpers ---------- */
+function deckKey(k) { return `${k}_${currentDeckId}`; }
+function currentDeck() { return decks.find(d => d.id === currentDeckId) || decks[0]; }
+function saveData() {
   localStorage.setItem(LS_DECKS, JSON.stringify(decks));
-  localStorage.setItem("leitnerCurrentDeck", currentDeckId);
+  localStorage.setItem(LS_CURR_DECK, currentDeckId);
+  localStorage.setItem(LS_UI_LANG, uiLang);
   localStorage.setItem(deckKey("cards"), JSON.stringify(activeCards));
   localStorage.setItem(deckKey("reserve"), JSON.stringify(reserveCards));
   localStorage.setItem(deckKey("learned"), JSON.stringify(learnedCards));
-  localStorage.setItem(deckKey("imports"), JSON.stringify(importsLog));
-  localStorage.setItem(deckKey("direction"), direction);
-  localStorage.setItem(deckKey("mode"), mode);
-  localStorage.setItem(deckKey("box"), String(currentTestBox));
 }
-function currentDeck(){ return decks.find(d=>d.id===currentDeckId)||decks[0]; }
+function isLandscape() { return window.matchMedia("(orientation: landscape)").matches; }
 
-/* ====== Text-Fit ====== */
-function fitText(el, min=16, max=72){
-  const availW = el.clientWidth, availH = el.clientHeight;
-  let lo=min, hi=max, best=min;
-  el.style.wordBreak="keep-all"; el.style.hyphens="auto";
-  while(lo<=hi){
-    const m=(lo+hi>>1);
-    el.style.fontSize=m+"px";
-    if(el.scrollWidth<=availW && el.scrollHeight<=availH){ best=m; lo=m+1; }
-    else { hi=m-1; }
-  }
-  el.style.fontSize=best+"px";
+/* ---------- i18n anwenden ---------- */
+function applyI18n() {
+  if (btnMode) btnMode.textContent = (mode === "lernen") ? t("modeLearn") : t("modeTest");
+  if (btnEdit) btnEdit.textContent = t("edit");
+  if (btnRight) btnRight.textContent = t("right");
+  if (btnWrong) btnWrong.textContent = t("wrong");
+  if (btnFresh) btnFresh.textContent = t("fresh");
+  if (directionBadge) directionBadge.textContent = (direction === "a2b") ? t("a2b") : t("b2a");
+
+  // Platzhalter „Keine Karten“ ggf. lokalisieren
+  if (tileEs && tileEs.textContent === "Keine Karten") tileEs.textContent = t("none");
+  if (tileDe && tileDe.textContent === "Keine Karten") tileDe.textContent = t("none");
 }
 
-/* ====== RF-Bar Sichtbarkeit ====== */
-function setRF(show){
-  rfBar.style.display = show ? 'flex' : 'none';
-  rfBar.setAttribute('aria-hidden', show ? 'false' : 'true');
-  // NEW: Platz unter den Karten schaffen, wenn RF sichtbar (nur Portrait)
-  document.body.classList.toggle('rf-on', !!show);
-}
-
-
-/* ====== Render ====== */
-let currentIndex = 0;
-let currentCard = null;
-
-function pickLearnCard(){
-  const b1 = activeCards.filter(c=>c.box===1);
-  if(b1.length===0) return null;
-  currentIndex = (currentIndex + b1.length) % b1.length;
-  return b1[currentIndex];
-}
-function pickTestCard(){
-  const pool = activeCards.filter(c=>c.box===currentTestBox);
-  if(pool.length===0) return null;
-  if(currentCard && pool.length>1){
-    let next; do{ next = pool[Math.floor(Math.random()*pool.length)]; }while(next===currentCard);
-    return next;
-  }
-  return pool[Math.floor(Math.random()*pool.length)];
-}
-
-function render(){
-  const isLandscape = matchMedia("(orientation:landscape)").matches;
-  boxBadge.style.display = isLandscape ? "block" : "none";
-
-  const deck = currentDeck();
-  const A = deck.sideA || "A", B = deck.sideB || "B";
-  toggleDirectionBtn.textContent = direction==="a2b" ? `${A} → ${B}` : `${B} → ${A}`;
-
-  if(mode==="lernen"){
-    setRF(false);
-    const c = pickLearnCard();
-    if(!c){ cardA.textContent="Keine Karten"; cardB.textContent=""; fitText(cardA); fitText(cardB); updateBoxUI(); updateImportsList(); return; }
-    cardA.textContent = direction==="a2b" ? c.sideA : c.sideB;
-    cardB.textContent = direction==="a2b" ? c.sideB : c.sideA;
-    fitText(cardA); fitText(cardB);
-  }else{
-    if(!currentCard) currentCard = pickTestCard();
-    if(!currentCard){ cardA.textContent="Keine Karten"; cardB.textContent=""; setRF(false); fitText(cardA); fitText(cardB); updateBoxUI(); updateImportsList(); return; }
-    cardA.textContent = direction==="a2b" ? currentCard.sideA : currentCard.sideB;
-    cardB.textContent = showAnswer ? (direction==="a2b" ? currentCard.sideB : currentCard.sideA) : "";
-    setRF(showAnswer);
-    fitText(cardA); fitText(cardB);
-  }
-
-  const countInBox = activeCards.filter(c=>c.box===currentTestBox).length;
-  boxBadge.textContent = `B${currentTestBox}: ${countInBox}`;
-
-  modeToggle.textContent = mode==="lernen" ? "Lernen" : "Prüfen";
-
-  updateBoxUI();
-  updateImportsList();
-}
-
-/* ====== Swipe/Tap Gesten ====== */
-(function addGestures(){
-  let sx=0, sy=0, dx=0, dy=0, moved=false;
-  cardsArea.addEventListener("touchstart", e=>{
-    const t=e.touches[0]; sx=t.clientX; sy=t.clientY; dx=dy=0; moved=false;
-  },{passive:true});
-  cardsArea.addEventListener("touchmove", e=>{
-    const t=e.touches[0]; dx=t.clientX-sx; dy=t.clientY-sy;
-    if(Math.abs(dx)>12||Math.abs(dy)>12) moved=true;
-    if(Math.abs(dx) > Math.abs(dy) + 6) e.preventDefault();
-  },{passive:false});
-  cardsArea.addEventListener("touchend", ()=>{
-    const absX=Math.abs(dx), absY=Math.abs(dy);
-    const isSwipe = absX>40 && absX>absY;
-    if(!isSwipe){
-      if(mode==="lernen"){ currentIndex++; render(); }
-      else { if(!showAnswer){ showAnswer=true; render(); } }
-      return;
-    }
-    if(mode==="lernen"){
-      currentIndex++; render();
-    }else if(showAnswer){
-      if(dx>0) btnRight.click(); else btnWrong.click();
-    }else{
-      showAnswer=true; render();
-    }
-  });
-})();
-
-/* ====== Buttons ====== */
-modeToggle.onclick = ()=>{
-  mode = (mode==="lernen") ? "prüfen" : "lernen";
-  showAnswer=false; currentCard=null; save(); render();
-};
-
-editToggle.onclick = ()=>{
-  editOpen = !editOpen;
-  if(editOpen){
-    const c = (mode==="lernen") ? pickLearnCard() : (currentCard || pickTestCard());
-    editA.value = direction==="a2b" ? (c?.sideA||"") : (c?.sideB||"");
-    editB.value = direction==="a2b" ? (c?.sideB||"") : (c?.sideA||"");
-    editPanel.hidden=false; setTimeout(()=>editA.focus(),10);
-  }else{
-    editPanel.hidden=true;
-  }
-};
-saveEditBtn.onclick = ()=>{
-  const A=editA.value.trim(), B=editB.value.trim();
-  if(!A||!B) return;
-  const target = (mode==="lernen") ? pickLearnCard() : currentCard;
-  if(!target) return;
-  if(direction==="a2b"){ target.sideA=A; target.sideB=B; } else { target.sideA=B; target.sideB=A; }
-  save(); render(); editPanel.hidden=true; editOpen=false;
-};
-cancelEditBtn.onclick = ()=>{ editPanel.hidden=true; editOpen=false; };
-
-btnRight.onclick = ()=>{
-  if(mode!=="prüfen"||!currentCard) return;
-  if(currentCard.box>=5){
-    activeCards = activeCards.filter(c=>c!==currentCard);
-    learnedCards.push({...currentCard, learnedAt:new Date().toISOString()});
-  }else{
-    currentCard.box += 1;
-    currentCard.lastSeen = new Date().toISOString();
-  }
-  showAnswer=false; currentCard=null; save(); render();
-};
-btnWrong.onclick = ()=>{
-  if(mode!=="prüfen"||!currentCard) return;
-  currentCard.box = Math.max(1, currentCard.box-1);
-  currentCard.wrong = (currentCard.wrong||0)+1;
-  currentCard.lastSeen = new Date().toISOString();
-  showAnswer=false; currentCard=null; save(); render();
-};
-
-/* ====== Drawer ====== */
-freshBtn.onclick = ()=>{
-  const take = Math.min(batchSizeFresh, reserveCards.length);
-  const add = reserveCards.splice(0,take).map(c=>({...c, box:1}));
-  activeCards.push(...add);
-  mode="lernen"; showAnswer=false; currentIndex = Math.max(0, activeCards.filter(c=>c.box===1).length - add.length);
-  save(); render();
-};
-
-/* ====== Decks ====== */
-function rebuildDeckSelect(){
-  deckSelect.innerHTML="";
-  decks.forEach(d=>{
-    const o=document.createElement("option");
-    o.value=d.id; o.textContent=`${d.name} ${d.id===currentDeckId?"(aktiv)":""}`;
-    deckSelect.appendChild(o);
-  });
-  deckSelect.value=currentDeckId;
-  sideALabel.value = currentDeck().sideA || "A";
-  sideBLabel.value = currentDeck().sideB || "B";
-}
-rebuildDeckSelect();
-
-/* *** NEU: zentraler, robuster Deckwechsel *** */
-function switchDeck(newDeckId){
-  currentDeckId = newDeckId;
-  // Zustand laden
-  activeCards  = JSON.parse(localStorage.getItem(deckKey("cards"))   || "[]");
-  reserveCards = JSON.parse(localStorage.getItem(deckKey("reserve")) || "[]");
-  learnedCards = JSON.parse(localStorage.getItem(deckKey("learned")) || "[]");
-  importsLog   = JSON.parse(localStorage.getItem(deckKey("imports")) || "[]");
-  direction    = localStorage.getItem(deckKey("direction")) || "a2b";
-  mode         = localStorage.getItem(deckKey("mode")) || "lernen";
-  currentTestBox = parseInt(localStorage.getItem(deckKey("box"))||"1",10);
-
-  // Phasen zurücksetzen
-  showAnswer=false; currentCard=null; currentIndex=0;
-
-  // Labels setzen
-  const d=currentDeck();
-  sideALabel.value = d?.sideA || "A";
-  sideBLabel.value = d?.sideB || "B";
-
-  // Falls aktive leer & Reserve vorhanden → Erstbefüllung
-  ensureInitialFill();
-
-  // Speicher updaten & UI neu
-  save();
-  render(); drawPie(); updateBoxUI();
-
-  // iOS: Maße nach einer Frame erneut berechnen
-  requestAnimationFrame(()=>{ render(); drawPie(); updateBoxUI(); });
-}
-
-deckSelect.onchange = ()=>{ switchDeck(deckSelect.value); };
-
-deckAddBtn.onclick = ()=>{
-  const name=prompt("Name der neuen Übung:"); if(!name) return;
-  const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
-  decks.push({id,name, sideA:"A", sideB:"B"});
-  save();
-  rebuildDeckSelect();
-  switchDeck(id); // leere Übung aktivieren
-};
-
-deckRenameBtn.onclick=()=>{
-  const d=currentDeck(); if(!d) return;
-  const name=prompt("Neuer Name:", d.name); if(!name) return;
-  d.name=name; save(); rebuildDeckSelect();
-};
-
-deckDeleteBtn.onclick=()=>{
-  if(decks.length<=1) return alert("Mindestens eine Übung muss bleiben.");
-  if(!confirm("Diese Übung wirklich löschen?")) return;
-  const id=currentDeckId;
-  ["cards","reserve","learned","imports","direction","mode","box"].forEach(k=>localStorage.removeItem(deckKey(k)));
-  decks = decks.filter(d=>d.id!==id);
-  save(); rebuildDeckSelect();
-  switchDeck(decks[0].id);
-};
-
-saveLabelsBtn.onclick=()=>{
-  const d=currentDeck(); if(!d) return;
-  d.sideA=sideALabel.value.trim()||"A"; d.sideB=sideBLabel.value.trim()||"B";
-  save(); render();
-};
-
-/* ====== Sprache ====== */
-langSelect.value = uiLang;
-langSelect.onchange = ()=>{ uiLang=langSelect.value; localStorage.setItem("uiLang",uiLang); applyI18n(); };
-
-/* ====== Richtung ====== */
-toggleDirectionBtn.onclick = ()=>{ direction = (direction==="a2b")?"b2a":"a2b"; save(); render(); };
-
-/* ====== CSV Import + Protokoll + Erstbefüllung ====== */
-csvFile.addEventListener("change", ev=>{
-  const file=ev.target.files[0]; if(!file) return;
-  const rdr=new FileReader();
-  rdr.onload=e=>{
-    const buf=e.target.result;
-    const decs=[new TextDecoder("utf-8"), new TextDecoder("windows-1252"), new TextDecoder("iso-8859-1")];
-    let text="", used="utf-8";
-    for(const d of decs){
-      const t=d.decode(buf); const bad=(t.match(/\uFFFD/g)||[]).length;
-      if(bad===0){ text=t; used=d.encoding||used; break; }
-      if(!text) text=t;
-    }
-    const lines=text.split(/\r?\n/);
-    let imported=0, skipped=0;
-    for(const raw of lines){
-      const s=raw.trim(); if(!s) continue;
-      const sep=(s.includes(";")&&(!s.includes(",")||s.indexOf(";")<s.indexOf(",")))?";":",";
-      const [a,b]=s.split(sep).map(x=>x?.trim().replace(/^"(.*)"$/,"$1"));
-      if(!a||!b) continue;
-      if(activeCards.some(c=>c.sideA===a)||reserveCards.some(c=>c.sideA===a)||learnedCards.some(c=>c.sideA===a)){ skipped++; continue; }
-      reserveCards.push({sideA:a, sideB:b, box:1});
-      imported++;
-    }
-
-    // Protokoll anfügen
-    importsLog.unshift({
-      name: file.name || "(ohne Name)",
-      size: file.size || 0,
-      imported,
-      skipped,
-      when: new Date().toISOString()
+/* ---------- Diagramme ---------- */
+function buildBoxChart() {
+  if (!boxChart) return;
+  boxChart.innerHTML = "";
+  const counts = [];
+  for (let i = 1; i <= 5; i++) counts.push(activeCards.filter(c => c.box === i).length);
+  const max = Math.max(...counts, 1);
+  counts.forEach((count, idx) => {
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.height = (count / max * 100) + "%";
+    bar.title = `${t("box")} ${idx + 1}: ${count}`;
+    bar.addEventListener("click", () => {
+      currentTestBox = idx + 1;
+      mode = (currentTestBox === 1) ? "lernen" : "prüfen";
+      revealed = (mode === "prüfen") ? false : true;
+      render();
+      applyI18n();
     });
+    boxChart.appendChild(bar);
+  });
+}
 
-    // Erstbefüllung, wenn aktiv leer
-    ensureInitialFill();
+function drawPieChart() {
+  if (!pieChartCanvas) return;
+  const ctx = pieChartCanvas.getContext("2d");
+  const W = pieChartCanvas.width, H = pieChartCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const total = activeCards.length + reserveCards.length + learnedCards.length;
+  if (total === 0) return;
+  const data = [
+    { label: "Aktiv", value: activeCards.length, color: "#3b82f6" },
+    { label: "Reserve", value: reserveCards.length, color: "#f59e0b" },
+    { label: "Gelernt", value: learnedCards.length, color: "#10b981" },
+  ];
+  let start = -Math.PI / 2;
+  data.forEach(seg => {
+    const slice = (seg.value / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(W/2, H/2);
+    ctx.arc(W/2, H/2, Math.min(W, H)/2, start, start + slice);
+    ctx.closePath(); ctx.fillStyle = seg.color; ctx.fill();
+    start += slice;
+  });
+}
 
-    save();
-    alert(`Import: ${imported} Einträge (Encoding: ${used})`);
-    render(); drawPie(); updateBoxUI(); updateImportsList();
-  };
-  rdr.readAsArrayBuffer(file);
+/* ---------- Kartenanzeige & Fitting ---------- */
+function cardTextA(card) { return (direction === "a2b") ? card.sideA : card.sideB; }
+function cardTextB(card) { return (direction === "a2b") ? card.sideB : card.sideA; }
+
+function render() {
+  // Box-Badge ggf. setzen
+  if (boxBadge) {
+    const countInBox = activeCards.filter(c => c.box === currentTestBox).length;
+    boxBadge.textContent = `B${currentTestBox}: ${countInBox}`;
+  }
+
+  // Buttons R/F nur sichtbar: Prüfen + Revealed
+  const showRF = (mode === "prüfen" && revealed === true);
+  if (btnRight) btnRight.style.display = showRF ? "inline-flex" : "none";
+  if (btnWrong) btnWrong.style.display = showRF ? "inline-flex" : "none";
+
+  // Karten-Content
+  if (mode === "lernen") {
+    const b1 = activeCards.filter(c => c.box === 1);
+    if (b1.length === 0) {
+      tileEs.textContent = t("none"); tileDe.textContent = "";
+      scheduleFit(); buildBoxChart(); drawPieChart(); return;
+    }
+    const card = b1[learnIndex % b1.length];
+    tileEs.textContent = cardTextA(card);
+    tileDe.textContent = cardTextB(card);
+  } else {
+    const bx = activeCards.filter(c => c.box === currentTestBox);
+    if (bx.length === 0) {
+      tileEs.textContent = t("none"); tileDe.textContent = "";
+      scheduleFit(); buildBoxChart(); drawPieChart(); return;
+    }
+    const card = pickTestCard(bx);
+    tileEs.textContent = cardTextA(card);
+    tileDe.textContent = revealed ? cardTextB(card) : ""; // erst nach Aufdecken
+  }
+
+  buildBoxChart();
+  drawPieChart();
+  scheduleFit();
+}
+
+let _lastTestId = null;
+function pickTestCard(list) {
+  // Zufällig, aber nicht 2x hintereinander dieselbe
+  if (list.length === 0) return null;
+  let idx = Math.floor(Math.random() * list.length);
+  if (list.length > 1 && list[idx].id === _lastTestId) {
+    idx = (idx + 1) % list.length;
+  }
+  const card = list[idx];
+  _lastTestId = card.id;
+  return card;
+}
+
+/* --- Text-Fitting (robust) --- */
+function fitTileText(el, minPx = 16, maxPx = 48) {
+  if (!el) return;
+  el.style.wordBreak = "keep-all";
+  el.style.hyphens = "auto";
+  // Startgröße
+  let lo = minPx, hi = maxPx, best = minPx;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    el.style.fontSize = mid + "px";
+    // Überläuft?
+    const over = el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+    if (!over) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  el.style.fontSize = best + "px";
+}
+function fitBothTiles() {
+  fitTileText(tileEs);
+  fitTileText(tileDe);
+}
+let _fitScheduled = false;
+function scheduleFit() {
+  if (_fitScheduled) return;
+  _fitScheduled = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      try { fitBothTiles(); } finally { _fitScheduled = false; }
+    });
+  });
+}
+function ensureFitOnStartup() {
+  scheduleFit();
+  setTimeout(scheduleFit, 120);
+  setTimeout(scheduleFit, 350);
+  setTimeout(scheduleFit, 800);
+  window.addEventListener("load", scheduleFit, { once: true });
+}
+function observeTileResize() {
+  if (!("ResizeObserver" in window)) return;
+  const ro = new ResizeObserver(() => scheduleFit());
+  if (tileEs) ro.observe(tileEs);
+  if (tileDe) ro.observe(tileDe);
+}
+window.addEventListener("orientationchange", () => setTimeout(scheduleFit, 140));
+window.addEventListener("resize", scheduleFit);
+
+/* ---------- Interaktion ---------- */
+// Modus-Toggle
+btnMode?.addEventListener("click", () => {
+  mode = (mode === "lernen") ? "prüfen" : "lernen";
+  revealed = (mode === "prüfen") ? false : true;
+  saveData();
+  render();
+  applyI18n();
 });
 
-/* ====== Erstbefüllung Box 1 (bis 20 Karten) ====== */
-function ensureInitialFill(){
-  if(activeCards.filter(c=>c.box===1).length===0 && reserveCards.length>0){
-    const take = Math.min(20, reserveCards.length);
-    const add = reserveCards.splice(0, take).map(c=>({...c, box:1}));
-    activeCards.push(...add);
-    mode="lernen"; showAnswer=false; currentIndex=0;
-  }
-}
+// Edit (nur Sichtbarkeit/Modus – Logik in HTML/CSS)
+btnEdit?.addEventListener("click", () => {
+  document.body.classList.toggle("editing");
+  // Beim Umschalten neu fitten
+  scheduleFit();
+});
 
-/* ====== Manage ====== */
-qs("#deleteBtn").onclick=()=>{
-  const c=(mode==="lernen")?pickLearnCard():currentCard;
-  if(!c) return;
-  if(!confirm("Aktive Karte löschen?")) return;
-  const i=activeCards.indexOf(c); if(i>=0) activeCards.splice(i,1);
-  currentCard=null; save(); render();
-};
-qs("#resetProgressBtn").onclick=()=>{
-  if(!confirm("Nur Lernfortschritt zurücksetzen?")) return;
-  activeCards=activeCards.map(c=>({...c, box:1, lastSeen:null, wrong:0}));
-  save(); render();
-};
-qs("#resetAllBtn").onclick=()=>{
-  if(!confirm("Alle Daten dieser Übung löschen?")) return;
-  activeCards=[]; reserveCards=[]; learnedCards=[]; importsLog=[];
-  save(); render(); drawPie(); updateBoxUI(); updateImportsList();
-};
+// +7 Nachschub
+btnFresh?.addEventListener("click", () => {
+  if (currentTestBox !== 1) currentTestBox = 1;
+  const take = Math.min(batchSizeFresh, reserveCards.length);
+  const added = reserveCards.splice(0, take).map(c => ({ ...c, box: 1 }));
+  activeCards.push(...added);
+  mode = "lernen";
+  revealed = true;
+  learnIndex = Math.max(0, activeCards.filter(c => c.box === 1).length - added.length);
+  saveData();
+  render();
+});
 
-/* ====== Stats & Box Bars ====== */
-function drawPie(){
-  const total = activeCards.length + reserveCards.length + learnedCards.length;
-  pie.clearRect(0,0,220,220);
-  if(!total) return;
-  const data=[
-    {v:activeCards.length, c:"#3b82f6"},
-    {v:reserveCards.length, c:"#f59e0b"},
-    {v:learnedCards.length, c:"#10b981"},
-  ];
-  let a=-Math.PI/2;
-  data.forEach(s=>{
-    const ang=s.v/total*2*Math.PI;
-    pie.beginPath(); pie.moveTo(110,110);
-    pie.arc(110,110,100,a,a+ang); pie.closePath();
-    pie.fillStyle=s.c; pie.fill(); a+=ang;
-  });
-}
-
-function updateBoxUI(){
-  const counts=[1,2,3,4,5].map(i=>activeCards.filter(c=>c.box===i).length);
-  const max=Math.max(...counts,1);
-  boxBars.innerHTML="";
-  counts.forEach((cnt, i)=>{
-    const div=document.createElement("div");
-    div.className="boxbar"+(currentTestBox===i+1?" active":"");
-    div.style.height = Math.max(10, Math.round(90*cnt/max))+"px";
-    const label=document.createElement("span"); label.textContent=`B${i+1}: ${cnt}`;
-    div.appendChild(label);
-    div.onclick=()=>{
-      currentTestBox=i+1;
-      mode = (currentTestBox===1) ? "lernen" : "prüfen";
-      showAnswer=false; currentCard=null;
-      save(); render();
-    };
-    boxBars.appendChild(div);
-  });
-}
-
-/* ====== Import-Protokoll UI ====== */
-function updateImportsList(){
-  importsList.innerHTML = "";
-  if(!importsLog || importsLog.length===0){
-    const li=document.createElement("li");
-    li.textContent="(noch keine CSV-Importe)";
-    importsList.appendChild(li);
-    return;
-  }
-  importsLog.forEach(entry=>{
-    const li=document.createElement("li");
-    const dt = new Date(entry.when);
-    li.innerHTML = `<strong>${entry.name}</strong> — importiert: ${entry.imported}, übersprungen: ${entry.skipped}
-      <small>${dt.toLocaleString()} • ${Math.round((entry.size||0)/1024)} KB</small>`;
-    importsList.appendChild(li);
-  });
-}
-
-/* ====== Layout Tick ====== */
-let raf=null;
-function queueLayout(){ if(raf) cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ render(); drawPie(); updateBoxUI(); updateImportsList(); }); }
-
-/* ====== Init ====== */
-function init(){
-  rebuildDeckSelect();
+// Richtung
+toggleDirectionBtn?.addEventListener("click", () => {
+  direction = (direction === "a2b") ? "b2a" : "a2b";
+  saveData();
+  render();
   applyI18n();
-  // Falls aktive leer & Reserve vorhanden (z. B. nach manuellem LocalStorage-Import)
-  ensureInitialFill();
-  save();
-  render(); drawPie(); updateBoxUI(); updateImportsList();
+});
+
+// Sprache
+if (langSelect) langSelect.value = uiLang;
+langSelect?.addEventListener("change", () => {
+  uiLang = langSelect.value;
+  localStorage.setItem(LS_UI_LANG, uiLang);
+  applyI18n();
+  scheduleFit();
+});
+
+// Deckwechsel
+function refreshDeckSelect() {
+  if (!deckSelect) return;
+  deckSelect.innerHTML = "";
+  decks.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.id; opt.textContent = d.name + (d.id === currentDeckId ? " (aktiv)" : "");
+    deckSelect.appendChild(opt);
+  });
+  deckSelect.value = currentDeckId;
+}
+deckSelect?.addEventListener("change", () => {
+  currentDeckId = deckSelect.value;
+  activeCards = JSON.parse(localStorage.getItem(deckKey("cards")) || "[]");
+  reserveCards = JSON.parse(localStorage.getItem(deckKey("reserve")) || "[]");
+  learnedCards = JSON.parse(localStorage.getItem(deckKey("learned")) || "[]");
+  revealed = (mode === "prüfen") ? false : true;
+  saveData();
+  render();
+  applyI18n();
+  updateImportedFilesList();
+  // Labels/Placeholder neu
+  const d = currentDeck();
+  if (inputSideA) inputSideA.placeholder = d.sideALabel || "A";
+  if (inputSideB) inputSideB.placeholder = d.sideBLabel || "B";
+});
+
+// Labels speichern
+btnSaveLabels?.addEventListener("click", () => {
+  const d = currentDeck(); if (!d) return;
+  d.sideALabel = (inputSideA.value || "A").trim();
+  d.sideBLabel = (inputSideB.value || "B").trim();
+  saveData();
+  render();
+  applyI18n();
+});
+
+// CSV-Import
+importCsv?.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const text = ev.target.result;
+      // CSV: "A;B" je Zeile – beide Spalten Pflicht
+      const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+      const newCards = [];
+      rows.forEach(line => {
+        // trenner ,; TAB erkennen
+        const parts = line.split(/;|,|\t/).map(s => s.trim());
+        if (parts.length >= 2 && parts[0] && parts[1]) {
+          newCards.push({
+            id: crypto.randomUUID(),
+            sideA: parts[0],
+            sideB: parts[1],
+            box: 0, // zunächst Reserve
+          });
+        }
+      });
+      // Datei im Deck protokollieren
+      const d = currentDeck();
+      d.importedFiles = d.importedFiles || [];
+      d.importedFiles.push(file.name);
+      reserveCards.push(...newCards);
+      // Automatisch 20 in Box 1 schieben, falls leer
+      if (activeCards.filter(c => c.box === 1).length === 0) {
+        const take = Math.min(20, reserveCards.length);
+        const added = reserveCards.splice(0, take).map(c => ({ ...c, box: 1 }));
+        activeCards.push(...added);
+        mode = "lernen";
+        revealed = true;
+      }
+      saveData();
+      updateImportedFilesList();
+      render();
+    } catch {
+      alert("Import fehlgeschlagen.");
+    }
+  };
+  reader.readAsText(file);
+  // Zurücksetzen, damit man dieselbe Datei erneut wählen kann
+  e.target.value = "";
+});
+
+function updateImportedFilesList() {
+  if (!importList) return;
+  const d = currentDeck();
+  importList.innerHTML = "";
+  (d.importedFiles || []).forEach(name => {
+    const li = document.createElement("li");
+    li.textContent = name;
+    importList.appendChild(li);
+  });
+}
+
+// Export
+btnExport?.addEventListener("click", () => {
+  const data = { activeCards, reserveCards, learnedCards };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "deck.json";
+  a.click();
+});
+
+// Korrektur (Prüfen)
+btnRight?.addEventListener("click", () => {
+  if (mode !== "prüfen" || !revealed) return;
+  const bx = activeCards.filter(c => c.box === currentTestBox);
+  if (bx.length === 0) return;
+  const card = bx.find(c => cardTextA(c) === tileEs.textContent);
+  if (!card) return;
+  card.box = Math.min(5, card.box + 1);
+  saveData();
+  revealed = false;
+  render();
+});
+
+btnWrong?.addEventListener("click", () => {
+  if (mode !== "prüfen" || !revealed) return;
+  const bx = activeCards.filter(c => c.box === currentTestBox);
+  if (bx.length === 0) return;
+  const card = bx.find(c => cardTextA(c) === tileEs.textContent);
+  if (!card) return;
+  card.box = 1;
+  saveData();
+  revealed = false;
+  render();
+});
+
+// Tippen/Swipen auf Karten
+let touchStartX = 0, touchStartY = 0, tracking = false;
+function onTouchStart(ev) {
+  tracking = true;
+  const t = ev.touches?.[0] || ev;
+  touchStartX = t.clientX; touchStartY = t.clientY;
+}
+function onTouchEnd(ev) {
+  if (!tracking) return;
+  tracking = false;
+  const t = ev.changedTouches?.[0] || ev;
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  const absX = Math.abs(dx), absY = Math.abs(dy);
+  const TH = 35; // Swipe-Schwelle
+  if (mode === "prüfen" && revealed) {
+    if (absX > absY && absX > TH) {
+      if (dx < 0) { btnWrong?.click(); return; }  // links = falsch
+      if (dx > 0) { btnRight?.click(); return; }  // rechts = richtig
+    }
+  }
+  // sonst: aufdecken (nur prüfen)
+  if (mode === "prüfen" && !revealed) {
+    revealed = true;
+    render();
+  }
+}
+[tileEs, tileDe].forEach(el => {
+  el?.addEventListener("touchstart", onTouchStart, { passive: true });
+  el?.addEventListener("touchend", onTouchEnd, { passive: true });
+  el?.addEventListener("mousedown", onTouchStart);
+  el?.addEventListener("mouseup", onTouchEnd);
+});
+
+/* ---------- Init ---------- */
+function init() {
+  // Deckliste füllen
+  refreshDeckSelect();
+
+  // Labels/Placeholder aus aktuellem Deck
+  const d = currentDeck();
+  if (inputSideA) inputSideA.placeholder = d.sideALabel || "A";
+  if (inputSideB) inputSideB.placeholder = d.sideBLabel || "B";
+
+  // Startstatus
+  revealed = (mode === "prüfen") ? false : true;
+
+  // UI auf Sprache
+  if (langSelect) langSelect.value = uiLang;
+  applyI18n();
+
+  // Rendering
+  render();
+
+  // robustes Fitting
+  ensureFitOnStartup();
+  observeTileResize();
+
+  // Import-Liste
+  updateImportedFilesList();
 }
 init();
