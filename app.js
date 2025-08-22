@@ -1,620 +1,559 @@
-/* =========================
-   Vokabeltrainer – index.js
-   ========================= */
+/* =========================================================================
+   Vokabeltrainer – app.js  (komplette, defensive Version)
+   Enthält Fixes:
+   - sichere UI-Overlays (ui-hidden statt hidden)
+   - Judge-Bar nur zeigen bei Prüfmodus + revealed
+   - Text-Fit sofort beim Start & nach jeder Layoutänderung
+   - Deck-/CSV-Import aktualisiert Charts, UI, Fit
+   - UI-Sprache aktualisiert alle sichtbaren Texte
+   ========================================================================= */
 
-/* ---------- Persistenz-Schlüssel ---------- */
+/* -------------------------- State & Storage -------------------------- */
 const LS_DECKS = "leitnerDecks";
-const LS_CURR_DECK = "leitnerCurrentDeck";
-const LS_UI_LANG = "uiLang";
+const LS_CURRENT_DECK = "leitnerCurrentDeck";
 
-/* ---------- Globaler State ---------- */
-let decks = JSON.parse(localStorage.getItem(LS_DECKS) || "[]");
-if (decks.length === 0) {
-  const id = crypto.randomUUID();
-  decks = [{ id, name: "Default", sideALabel: "A", sideBLabel: "B", importedFiles: [] }];
-  localStorage.setItem(LS_DECKS, JSON.stringify(decks));
-}
-let currentDeckId = localStorage.getItem(LS_CURR_DECK) || decks[0].id;
-let activeCards = JSON.parse(localStorage.getItem(deckKey("cards")) || "[]");    // {sideA, sideB, box}
-let reserveCards = JSON.parse(localStorage.getItem(deckKey("reserve")) || "[]");
-let learnedCards = JSON.parse(localStorage.getItem(deckKey("learned")) || "[]");
-let uiLang = localStorage.getItem(LS_UI_LANG) || "de";
-
-let mode = "lernen";            // "lernen" | "prüfen"
-let direction = "a2b";          // "a2b" | "b2a"
-let currentTestBox = 1;         // 1..5
-let learnIndex = 0;             // Zeiger in Box 1
-let revealed = false;           // Karte im Prüfen aufgedeckt?
-const batchSizeFresh = 7;
-
-/* ---------- DOM-Referenzen ---------- */
-const btnMode = document.getElementById("btnMode");
-const btnEdit = document.getElementById("btnEdit");
-const drawerToggle = document.getElementById("drawerToggle");
-
-const tileEs = document.getElementById("tileEs");
-const tileDe = document.getElementById("tileDe");
-
-const btnRight = document.getElementById("btnRight");
-const btnWrong = document.getElementById("btnWrong");
-
-const boxChart = document.getElementById("boxChart");
-const pieChartCanvas = document.getElementById("pieChart");
-const boxBadge = document.getElementById("boxBadge"); // optional (Landscape)
-
-const langSelect = document.getElementById("langSelect");
-const deckSelect = document.getElementById("deckSelect");
-const btnFresh = document.getElementById("btnFresh");
-
-const inputSideA = document.getElementById("inputSideA");
-const inputSideB = document.getElementById("inputSideB");
-const btnSaveLabels = document.getElementById("btnSaveLabels");
-
-const importCsv = document.getElementById("importCsv");
-const importList = document.getElementById("importList");
-const btnExport = document.getElementById("btnExport");
-
-const directionBadge = document.getElementById("directionBadge");
-const toggleDirectionBtn = document.getElementById("toggleDirectionBtn");
-
-/* ---------- i18n ---------- */
-const I18N = {
-  de: {
-    modeLearn: "Lernen",
-    modeTest: "Prüfen",
-    edit: "Bearbeiten",
-    menu: "Werkzeug",
-    right: "Richtig",
-    wrong: "Falsch",
-    fresh: "+7",
-    stats: "Statistik",
-    progress: "Fortschritt",
-    uiLanguage: "UI-Sprache",
-    decks: "Übungen",
-    deck: "Deck",
-    add: "Neu",
-    rename: "Umbenennen",
-    remove: "Löschen",
-    sideA: "A",
-    sideB: "B",
-    save: "Speichern",
-    cancel: "Abbrechen",
-    import: "CSV-Import",
-    export: "Exportieren",
-    direction: "Richtung",
-    a2b: "A → B",
-    b2a: "B → A",
-    manage: "Verwalten",
-    delActiveCard: "Aktive Karte löschen",
-    resetProgress: "Nur Fortschritt löschen",
-    delDeckAndProgress: "Kartendeck aus Übung löschen",
-    box: "Box",
-    none: "Keine Karten",
-    points: "Punkte",
-    level: "Level",
-    streakDays: "d",
-  },
-  en: {
-    modeLearn: "Learn",
-    modeTest: "Test",
-    edit: "Edit",
-    menu: "Tools",
-    right: "Right",
-    wrong: "Wrong",
-    fresh: "+7",
-    stats: "Statistics",
-    progress: "Progress",
-    uiLanguage: "UI language",
-    decks: "Exercises",
-    deck: "Deck",
-    add: "New",
-    rename: "Rename",
-    remove: "Delete",
-    sideA: "A",
-    sideB: "B",
-    save: "Save",
-    cancel: "Cancel",
-    import: "CSV import",
-    export: "Export",
-    direction: "Direction",
-    a2b: "A → B",
-    b2a: "B → A",
-    manage: "Manage",
-    delActiveCard: "Delete active card",
-    resetProgress: "Reset progress only",
-    delDeckAndProgress: "Remove deck from exercise",
-    box: "Box",
-    none: "No cards",
-    points: "Points",
-    level: "Level",
-    streakDays: "d",
-  },
-  sv: {
-    modeLearn: "Lära",
-    modeTest: "Testa",
-    edit: "Redigera",
-    menu: "Verktyg",
-    right: "Rätt",
-    wrong: "Fel",
-    fresh: "+7",
-    stats: "Statistik",
-    progress: "Framsteg",
-    uiLanguage: "UI-språk",
-    decks: "Övningar",
-    deck: "Kortlek",
-    add: "Ny",
-    rename: "Byt namn",
-    remove: "Radera",
-    sideA: "A",
-    sideB: "B",
-    save: "Spara",
-    cancel: "Avbryt",
-    import: "CSV-import",
-    export: "Exportera",
-    direction: "Riktning",
-    a2b: "A → B",
-    b2a: "B → A",
-    manage: "Hantera",
-    delActiveCard: "Ta bort aktivt kort",
-    resetProgress: "Återställ bara framsteg",
-    delDeckAndProgress: "Ta bort lek från övning",
-    box: "Box",
-    none: "Inga kort",
-    points: "Poäng",
-    level: "Nivå",
-    streakDays: "d",
-  },
-  es: {
-    modeLearn: "Aprender",
-    modeTest: "Repasar",
-    edit: "Editar",
-    menu: "Herramientas",
-    right: "Correcto",
-    wrong: "Incorrecto",
-    fresh: "+7",
-    stats: "Estadísticas",
-    progress: "Progreso",
-    uiLanguage: "Idioma de la UI",
-    decks: "Ejercicios",
-    deck: "Mazo",
-    add: "Nuevo",
-    rename: "Renombrar",
-    remove: "Eliminar",
-    sideA: "A",
-    sideB: "B",
-    save: "Guardar",
-    cancel: "Cancelar",
-    import: "Importar CSV",
-    export: "Exportar",
-    direction: "Dirección",
-    a2b: "A → B",
-    b2a: "B → A",
-    manage: "Administrar",
-    delActiveCard: "Eliminar carta actual",
-    resetProgress: "Reiniciar progreso",
-    delDeckAndProgress: "Quitar mazo del ejercicio",
-    box: "Caja",
-    none: "Sin cartas",
-    points: "Puntos",
-    level: "Nivel",
-    streakDays: "d",
-  },
+const state = {
+  mode: "lernen",         // "lernen" | "pruefen"
+  revealed: true,         // im Lernen: true (beide Seiten), im Prüfen erst nach revealAnswer()
+  currentBox: 1,          // aktive Box in Prüfen/Diagramm
+  uiLang: localStorage.getItem("uiLang") || "de",
+  combo: 0
 };
-function t(key) {
-  const pack = I18N[uiLang] || I18N.de;
-  return pack[key] ?? key;
+
+let decks = safeParse(localStorage.getItem(LS_DECKS), []);
+if (decks.length === 0) {
+  const id = crypto?.randomUUID?.() || "deck-default";
+  decks = [{ id, name: "Default", sideALabel: "A", sideBLabel: "B", csvNames: [] }];
+  localStorage.setItem(LS_DECKS, JSON.stringify(decks));
+}
+let currentDeckId = localStorage.getItem(LS_CURRENT_DECK) || decks[0].id;
+
+function deckKey(suffix){ return `${suffix}_${currentDeckId}`; }
+
+let activeCards  = safeParse(localStorage.getItem(deckKey("cards")),   []);
+let reserveCards = safeParse(localStorage.getItem(deckKey("reserve")), []);
+let learnedCards = safeParse(localStorage.getItem(deckKey("learned")), []);
+
+function safeParse(str, fallback){
+  try { return JSON.parse(str ?? "") ?? fallback; } catch { return fallback; }
 }
 
-/* ---------- Helpers ---------- */
-function deckKey(k) { return `${k}_${currentDeckId}`; }
-function currentDeck() { return decks.find(d => d.id === currentDeckId) || decks[0]; }
-function saveData() {
+function persist(){
   localStorage.setItem(LS_DECKS, JSON.stringify(decks));
-  localStorage.setItem(LS_CURR_DECK, currentDeckId);
-  localStorage.setItem(LS_UI_LANG, uiLang);
-  localStorage.setItem(deckKey("cards"), JSON.stringify(activeCards));
+  localStorage.setItem(LS_CURRENT_DECK, currentDeckId);
+  localStorage.setItem(deckKey("cards"),   JSON.stringify(activeCards));
   localStorage.setItem(deckKey("reserve"), JSON.stringify(reserveCards));
   localStorage.setItem(deckKey("learned"), JSON.stringify(learnedCards));
-}
-function isLandscape() { return window.matchMedia("(orientation: landscape)").matches; }
-
-/* ---------- i18n anwenden ---------- */
-function applyI18n() {
-  if (btnMode) btnMode.textContent = (mode === "lernen") ? t("modeLearn") : t("modeTest");
-  if (btnEdit) btnEdit.textContent = t("edit");
-  if (btnRight) btnRight.textContent = t("right");
-  if (btnWrong) btnWrong.textContent = t("wrong");
-  if (btnFresh) btnFresh.textContent = t("fresh");
-  if (directionBadge) directionBadge.textContent = (direction === "a2b") ? t("a2b") : t("b2a");
-
-  // Platzhalter „Keine Karten“ ggf. lokalisieren
-  if (tileEs && tileEs.textContent === "Keine Karten") tileEs.textContent = t("none");
-  if (tileDe && tileDe.textContent === "Keine Karten") tileDe.textContent = t("none");
+  localStorage.setItem("uiLang", state.uiLang);
 }
 
-/* ---------- Diagramme ---------- */
-function buildBoxChart() {
-  if (!boxChart) return;
-  boxChart.innerHTML = "";
-  const counts = [];
-  for (let i = 1; i <= 5; i++) counts.push(activeCards.filter(c => c.box === i).length);
+/* -------------------------- DOM Helpers -------------------------- */
+const $ = (sel) => document.querySelector(sel);
+const byId = (id) => document.getElementById(id);
+
+// Kern-Elemente (defensiv – können fehlen)
+const elTileA           = byId("tileA") || byId("tileEs") || byId("tileFront") || byId("tile1");
+const elTileB           = byId("tileB") || byId("tileDe") || byId("tileBack")  || byId("tile2");
+const elJudgeBar        = byId("judgeBar");
+const elBtnWrong        = byId("btnWrong");
+const elBtnRight        = byId("btnRight");
+const elModeToggle      = byId("modeToggle");      // Button „Lernen/Prüfen“
+const elEditBtn         = byId("editBtn");         // Button „Bearbeiten“
+const elFabMenu         = byId("menuBtn");         // FAB / Menü
+const elDrawer          = byId("drawer");
+const elDrawerToggle    = byId("drawerToggle") || elFabMenu;
+const elDrawerClose     = byId("drawerClose");
+const elDeckSelect      = byId("deckSelect");
+const elLangSelect      = byId("langSelect");
+const elImportFile      = byId("importFile");
+const elAdd7Btn         = byId("freshBtn") || byId("add7Btn");
+const elBoxChart        = byId("boxChart");
+const elPieChart        = byId("pieChart");
+const elBoxBadge        = byId("landInfoText") || byId("boxBadge");
+const elDirectionBadge  = byId("directionBadge");
+const elToggleDirection = byId("toggleDirectionBtn");
+const inputA            = byId("inputSideA");
+const inputB            = byId("inputSideB");
+const saveLabelsBtn     = byId("saveLabelsBtn");
+const sideALabelInput   = byId("sideALabelInput");
+const sideBLabelInput   = byId("sideBLabelInput");
+
+// Slide-Up Panel & Landscape-Rail (optional)
+const elSlideUpPanel    = byId("slideupPanel");
+const elLandscapeRail   = byId("landscapeRail");
+
+/* -------------------------- i18n -------------------------- */
+const I18N = {
+  de: {
+    learn: "Lernen",
+    test: "Prüfen",
+    edit: "Bearbeiten",
+    good: "Richtig",
+    bad: "Falsch",
+    boxPrefix: "B",
+    none: "Keine Karten",
+    a: "A",
+    b: "B"
+  },
+  en: {
+    learn: "Learn",
+    test: "Test",
+    edit: "Edit",
+    good: "Correct",
+    bad: "Wrong",
+    boxPrefix: "B",
+    none: "No cards",
+    a: "A",
+    b: "B"
+  },
+  es: {
+    learn: "Aprender",
+    test: "Probar",
+    edit: "Editar",
+    good: "Correcto",
+    bad: "Fallo",
+    boxPrefix: "C",
+    none: "Sin tarjetas",
+    a: "A",
+    b: "B"
+  },
+  sv: {
+    learn: "Lära",
+    test: "Testa",
+    edit: "Redigera",
+    good: "Rätt",
+    bad: "Fel",
+    boxPrefix: "L",
+    none: "Inga kort",
+    a: "A",
+    b: "B"
+  }
+};
+function t(key){ return (I18N[state.uiLang] && I18N[state.uiLang][key]) || I18N.de[key] || key; }
+
+/* -------------------------- Deck helpers -------------------------- */
+function currentDeck(){
+  return decks.find(d=>d.id===currentDeckId) || decks[0];
+}
+function currentBoxCount(){
+  return activeCards.filter(c=>c.box===state.currentBox).length;
+}
+
+/* -------------------------- UI Overlay visibility (Fix) -------------------------- */
+function uiShow(el){ if (el) el.classList.remove("ui-hidden"); }
+function uiHide(el){ if (el) el.classList.add("ui-hidden"); }
+
+function updateJudgeBarVisibility(){
+  if (!elJudgeBar) return;
+  const portrait = window.matchMedia("(orientation: portrait)").matches;
+  const shouldShow = portrait && state.mode === "pruefen" && state.revealed === true && currentBoxCount() > 0;
+  if (shouldShow) uiShow(elJudgeBar); else uiHide(elJudgeBar);
+}
+
+/* -------------------------- Fit text into tiles -------------------------- */
+function fitTileText(tile, minPx=14, maxPx=120){
+  if (!tile) return;
+  // Inhalt messen – während Messung kein Umbruch mitten im Wort
+  tile.style.wordBreak = "keep-all";
+  tile.style.hyphens = "auto";
+  tile.style.whiteSpace = "normal";
+
+  // Binäre Suche für Schriftgröße
+  let lo=minPx, hi=maxPx, best=minPx;
+  const fits = () => (tile.scrollWidth <= tile.clientWidth+1) && (tile.scrollHeight <= tile.clientHeight+1);
+  // Start bei hi und runter
+  while (lo <= hi){
+    const mid = Math.floor((lo+hi)/2);
+    tile.style.fontSize = mid + "px";
+    if (fits()){ best = mid; lo = mid+1; } else { hi = mid-1; }
+  }
+  tile.style.fontSize = best + "px";
+}
+
+function fitAllTilesSoon(){
+  // nach next paint, dann noch einmal nach kurzer Zeit (falls Fonts laden)
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      fitTileText(elTileA);
+      fitTileText(elTileB);
+    }, 0);
+    setTimeout(()=>{
+      fitTileText(elTileA);
+      fitTileText(elTileB);
+    }, 120);
+  });
+}
+
+/* -------------------------- Rendering -------------------------- */
+function renderCards(forceShowBack=false){
+  if (!elTileA || !elTileB) return;
+  const cardsInBox1 = activeCards.filter(c=>c.box===1);
+
+  if (state.mode === "lernen"){
+    state.revealed = true;
+    const card = cardsInBox1[learnIndex % Math.max(cardsInBox1.length,1)];
+    if (!cardsInBox1.length){
+      elTileA.textContent = t("none");
+      elTileB.textContent = "";
+    } else {
+      setTileTextFromDirection(elTileA, elTileB, card);
+    }
+  } else {
+    const bx = activeCards.filter(c=>c.box===state.currentBox);
+    if (!bx.length){
+      elTileA.textContent = t("none");
+      elTileB.textContent = "";
+      state.revealed = false;
+    } else {
+      const card = bx[pruefIndex % bx.length];
+      // Vorderseite anzeigen
+      if (!state.revealed || !forceShowBack){
+        setTileFront(elTileA, elTileB, card);
+      } else {
+        // Rückseite
+        setTileBack(elTileA, elTileB, card);
+      }
+    }
+  }
+  updateTopUI();
+  updateJudgeBarVisibility();
+  fitAllTilesSoon();
+}
+
+function setTileTextFromDirection(aEl, bEl, card){
+  const dirA2B = (direction === "a2b");
+  aEl.textContent = dirA2B ? card.sideA : card.sideB;
+  bEl.textContent = dirA2B ? card.sideB : card.sideA;
+}
+function setTileFront(aEl, bEl, card){
+  // Front = nur eine Seite sichtbar (zweite leeren)
+  const dirA2B = (direction === "a2b");
+  aEl.textContent = dirA2B ? card.sideA : card.sideB;
+  bEl.textContent = "";
+}
+function setTileBack(aEl, bEl, card){
+  const dirA2B = (direction === "a2b");
+  aEl.textContent = dirA2B ? card.sideA : card.sideB;
+  bEl.textContent = dirA2B ? card.sideB : card.sideA;
+}
+
+/* -------------------------- Mode & indices -------------------------- */
+let learnIndex = 0;
+let pruefIndex = 0;
+let direction  = "a2b"; // "a2b" | "b2a"
+
+function setMode(newMode){
+  state.mode = newMode;
+  state.revealed = (newMode === "lernen");
+  renderCards();
+}
+
+function revealAnswer(){
+  if (state.mode !== "pruefen") return;
+  state.revealed = true;
+  renderCards(true);
+}
+
+/* -------------------------- Top UI texts -------------------------- */
+function updateTopUI(){
+  if (elModeToggle){
+    elModeToggle.textContent = (state.mode === "lernen") ? t("learn") : t("test");
+  }
+  if (elEditBtn) elEditBtn.textContent = t("edit");
+  if (elBoxBadge){
+    const d = t("boxPrefix");
+    elBoxBadge.textContent = `${d}${state.currentBox}: ${currentBoxCount()}`;
+  }
+  if (elDirectionBadge){
+    const d = currentDeck();
+    const A = d.sideALabel || t("a");
+    const B = d.sideBLabel || t("b");
+    elDirectionBadge.textContent = (direction==="a2b") ? `${A} → ${B}` : `${B} → ${A}`;
+  }
+  // Judge-Buttons (sofern die Bar sichtbar ist)
+  if (elBtnRight) elBtnRight.textContent = t("good");
+  if (elBtnWrong) elBtnWrong.textContent = t("bad");
+}
+
+/* -------------------------- Charts (defensiv) -------------------------- */
+function buildBoxChart(){
+  if (!elBoxChart) return;
+  elBoxChart.innerHTML = "";
+  const counts = [1,2,3,4,5].map(i => activeCards.filter(c=>c.box===i).length);
   const max = Math.max(...counts, 1);
-  counts.forEach((count, idx) => {
+  counts.forEach((count, idx)=>{
     const bar = document.createElement("div");
     bar.className = "bar";
-    bar.style.height = (count / max * 100) + "%";
-    bar.title = `${t("box")} ${idx + 1}: ${count}`;
-    bar.addEventListener("click", () => {
-      currentTestBox = idx + 1;
-      mode = (currentTestBox === 1) ? "lernen" : "prüfen";
-      revealed = (mode === "prüfen") ? false : true;
-      render();
-      applyI18n();
-    });
-    boxChart.appendChild(bar);
+    bar.style.height = (count/max*100) + "%";
+    bar.title = `${t("boxPrefix")}${idx+1}: ${count}`;
+    bar.addEventListener("click", ()=>{
+      state.currentBox = idx+1;
+      if (state.mode === "lernen" && state.currentBox !== 1){
+        setMode("pruefen");
+      } else {
+        renderCards();
+      }
+    }, {passive:true});
+    elBoxChart.appendChild(bar);
   });
 }
 
-function drawPieChart() {
-  if (!pieChartCanvas) return;
-  const ctx = pieChartCanvas.getContext("2d");
-  const W = pieChartCanvas.width, H = pieChartCanvas.height;
-  ctx.clearRect(0, 0, W, H);
+function drawPieChart(){
+  if (!elPieChart || !elPieChart.getContext) return;
+  const ctx = elPieChart.getContext("2d");
+  const w = elPieChart.width, h = elPieChart.height;
+  ctx.clearRect(0,0,w,h);
   const total = activeCards.length + reserveCards.length + learnedCards.length;
-  if (total === 0) return;
+  if (!total) return;
   const data = [
-    { label: "Aktiv", value: activeCards.length, color: "#3b82f6" },
-    { label: "Reserve", value: reserveCards.length, color: "#f59e0b" },
-    { label: "Gelernt", value: learnedCards.length, color: "#10b981" },
+    {value: activeCards.length,  color:"#3b82f6"},
+    {value: reserveCards.length, color:"#f59e0b"},
+    {value: learnedCards.length, color:"#10b981"}
   ];
-  let start = -Math.PI / 2;
-  data.forEach(seg => {
-    const slice = (seg.value / total) * Math.PI * 2;
-    ctx.beginPath(); ctx.moveTo(W/2, H/2);
-    ctx.arc(W/2, H/2, Math.min(W, H)/2, start, start + slice);
-    ctx.closePath(); ctx.fillStyle = seg.color; ctx.fill();
+  let start = -Math.PI/2;
+  const cx = w/2, cy = h/2, r = Math.min(cx, cy);
+  for (const seg of data){
+    const slice = (seg.value/total) * 2*Math.PI;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,start,start+slice); ctx.closePath();
+    ctx.fillStyle = seg.color; ctx.fill();
     start += slice;
-  });
+  }
 }
 
-/* ---------- Kartenanzeige & Fitting ---------- */
-function cardTextA(card) { return (direction === "a2b") ? card.sideA : card.sideB; }
-function cardTextB(card) { return (direction === "a2b") ? card.sideB : card.sideA; }
+/* -------------------------- Deck & CSV Import -------------------------- */
+function populateDeckSelect(){
+  if (!elDeckSelect) return;
+  elDeckSelect.innerHTML = "";
+  decks.forEach(d=>{
+    const opt = document.createElement("option");
+    opt.value = d.id; opt.textContent = d.name + (d.id===currentDeckId ? " (aktiv)" : "");
+    elDeckSelect.appendChild(opt);
+  });
+  elDeckSelect.value = currentDeckId;
+}
 
-function render() {
-  // Box-Badge ggf. setzen
-  if (boxBadge) {
-    const countInBox = activeCards.filter(c => c.box === currentTestBox).length;
-    boxBadge.textContent = `B${currentTestBox}: ${countInBox}`;
-  }
-
-  // Buttons R/F nur sichtbar: Prüfen + Revealed
-  const showRF = (mode === "prüfen" && revealed === true);
-  if (btnRight) btnRight.style.display = showRF ? "inline-flex" : "none";
-  if (btnWrong) btnWrong.style.display = showRF ? "inline-flex" : "none";
-
-  // Karten-Content
-  if (mode === "lernen") {
-    const b1 = activeCards.filter(c => c.box === 1);
-    if (b1.length === 0) {
-      tileEs.textContent = t("none"); tileDe.textContent = "";
-      scheduleFit(); buildBoxChart(); drawPieChart(); return;
-    }
-    const card = b1[learnIndex % b1.length];
-    tileEs.textContent = cardTextA(card);
-    tileDe.textContent = cardTextB(card);
-  } else {
-    const bx = activeCards.filter(c => c.box === currentTestBox);
-    if (bx.length === 0) {
-      tileEs.textContent = t("none"); tileDe.textContent = "";
-      scheduleFit(); buildBoxChart(); drawPieChart(); return;
-    }
-    const card = pickTestCard(bx);
-    tileEs.textContent = cardTextA(card);
-    tileDe.textContent = revealed ? cardTextB(card) : ""; // erst nach Aufdecken
-  }
-
+function switchDeck(id){
+  if (!id || id === currentDeckId) return;
+  currentDeckId = id;
+  activeCards  = safeParse(localStorage.getItem(deckKey("cards")),   []);
+  reserveCards = safeParse(localStorage.getItem(deckKey("reserve")), []);
+  learnedCards = safeParse(localStorage.getItem(deckKey("learned")), []);
+  persist();
+  populateDeckSelect();
+  renderCards();
   buildBoxChart();
   drawPieChart();
-  scheduleFit();
+  fitAllTilesSoon();
+  updateJudgeBarVisibility();
 }
 
-let _lastTestId = null;
-function pickTestCard(list) {
-  // Zufällig, aber nicht 2x hintereinander dieselbe
-  if (list.length === 0) return null;
-  let idx = Math.floor(Math.random() * list.length);
-  if (list.length > 1 && list[idx].id === _lastTestId) {
-    idx = (idx + 1) % list.length;
+async function importJsonFile(file){
+  const text = await file.text();
+  const data = safeParse(text, {});
+  const newActive  = Array.isArray(data.activeCards)  ? data.activeCards  : [];
+  const newReserve = Array.isArray(data.reserveCards) ? data.reserveCards : [];
+  const newLearned = Array.isArray(data.learnedCards) ? data.learnedCards : [];
+
+  // falls leer → CSV-JSON aus fremder Struktur tolerieren
+  if (!newActive.length && Array.isArray(data.cards)){
+    data.cards.forEach(c=>c.box = c.box || 1);
+    newActive.push(...data.cards);
   }
-  const card = list[idx];
-  _lastTestId = card.id;
-  return card;
-}
 
-/* --- Text-Fitting (robust) --- */
-function fitTileText(el, minPx = 16, maxPx = 48) {
-  if (!el) return;
-  el.style.wordBreak = "keep-all";
-  el.style.hyphens = "auto";
-  // Startgröße
-  let lo = minPx, hi = maxPx, best = minPx;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    el.style.fontSize = mid + "px";
-    // Überläuft?
-    const over = el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
-    if (!over) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+  activeCards  = newActive.map(n=>({...n, box: n.box || 1}));
+  reserveCards = newReserve.map(n=>({...n, box: 1}));
+  learnedCards = newLearned.map(n=>({...n, box: 5}));
+
+  // neue Übung: Box1 automatisch befüllen (20)
+  if (activeCards.filter(c=>c.box===1).length === 0 && reserveCards.length){
+    const take = reserveCards.splice(0, Math.min(20,reserveCards.length))
+                              .map(c=>({...c, box:1}));
+    activeCards.push(...take);
   }
-  el.style.fontSize = best + "px";
-}
-function fitBothTiles() {
-  fitTileText(tileEs);
-  fitTileText(tileDe);
-}
-let _fitScheduled = false;
-function scheduleFit() {
-  if (_fitScheduled) return;
-  _fitScheduled = true;
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      try { fitBothTiles(); } finally { _fitScheduled = false; }
-    });
-  });
-}
-function ensureFitOnStartup() {
-  scheduleFit();
-  setTimeout(scheduleFit, 120);
-  setTimeout(scheduleFit, 350);
-  setTimeout(scheduleFit, 800);
-  window.addEventListener("load", scheduleFit, { once: true });
-}
-function observeTileResize() {
-  if (!("ResizeObserver" in window)) return;
-  const ro = new ResizeObserver(() => scheduleFit());
-  if (tileEs) ro.observe(tileEs);
-  if (tileDe) ro.observe(tileDe);
-}
-window.addEventListener("orientationchange", () => setTimeout(scheduleFit, 140));
-window.addEventListener("resize", scheduleFit);
 
-/* ---------- Interaktion ---------- */
-// Modus-Toggle
-btnMode?.addEventListener("click", () => {
-  mode = (mode === "lernen") ? "prüfen" : "lernen";
-  revealed = (mode === "prüfen") ? false : true;
-  saveData();
-  render();
-  applyI18n();
-});
-
-// Edit (nur Sichtbarkeit/Modus – Logik in HTML/CSS)
-btnEdit?.addEventListener("click", () => {
-  document.body.classList.toggle("editing");
-  // Beim Umschalten neu fitten
-  scheduleFit();
-});
-
-// +7 Nachschub
-btnFresh?.addEventListener("click", () => {
-  if (currentTestBox !== 1) currentTestBox = 1;
-  const take = Math.min(batchSizeFresh, reserveCards.length);
-  const added = reserveCards.splice(0, take).map(c => ({ ...c, box: 1 }));
-  activeCards.push(...added);
-  mode = "lernen";
-  revealed = true;
-  learnIndex = Math.max(0, activeCards.filter(c => c.box === 1).length - added.length);
-  saveData();
-  render();
-});
-
-// Richtung
-toggleDirectionBtn?.addEventListener("click", () => {
-  direction = (direction === "a2b") ? "b2a" : "a2b";
-  saveData();
-  render();
-  applyI18n();
-});
-
-// Sprache
-if (langSelect) langSelect.value = uiLang;
-langSelect?.addEventListener("change", () => {
-  uiLang = langSelect.value;
-  localStorage.setItem(LS_UI_LANG, uiLang);
-  applyI18n();
-  scheduleFit();
-});
-
-// Deckwechsel
-function refreshDeckSelect() {
-  if (!deckSelect) return;
-  deckSelect.innerHTML = "";
-  decks.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.id; opt.textContent = d.name + (d.id === currentDeckId ? " (aktiv)" : "");
-    deckSelect.appendChild(opt);
-  });
-  deckSelect.value = currentDeckId;
-}
-deckSelect?.addEventListener("change", () => {
-  currentDeckId = deckSelect.value;
-  activeCards = JSON.parse(localStorage.getItem(deckKey("cards")) || "[]");
-  reserveCards = JSON.parse(localStorage.getItem(deckKey("reserve")) || "[]");
-  learnedCards = JSON.parse(localStorage.getItem(deckKey("learned")) || "[]");
-  revealed = (mode === "prüfen") ? false : true;
-  saveData();
-  render();
-  applyI18n();
-  updateImportedFilesList();
-  // Labels/Placeholder neu
+  // Dateiname merken
   const d = currentDeck();
-  if (inputSideA) inputSideA.placeholder = d.sideALabel || "A";
-  if (inputSideB) inputSideB.placeholder = d.sideBLabel || "B";
-});
+  d.csvNames = Array.isArray(d.csvNames) ? d.csvNames : [];
+  d.csvNames.push(file.name);
 
-// Labels speichern
-btnSaveLabels?.addEventListener("click", () => {
-  const d = currentDeck(); if (!d) return;
-  d.sideALabel = (inputSideA.value || "A").trim();
-  d.sideBLabel = (inputSideB.value || "B").trim();
-  saveData();
-  render();
-  applyI18n();
-});
-
-// CSV-Import
-importCsv?.addEventListener("change", (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const text = ev.target.result;
-      // CSV: "A;B" je Zeile – beide Spalten Pflicht
-      const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
-      const newCards = [];
-      rows.forEach(line => {
-        // trenner ,; TAB erkennen
-        const parts = line.split(/;|,|\t/).map(s => s.trim());
-        if (parts.length >= 2 && parts[0] && parts[1]) {
-          newCards.push({
-            id: crypto.randomUUID(),
-            sideA: parts[0],
-            sideB: parts[1],
-            box: 0, // zunächst Reserve
-          });
-        }
-      });
-      // Datei im Deck protokollieren
-      const d = currentDeck();
-      d.importedFiles = d.importedFiles || [];
-      d.importedFiles.push(file.name);
-      reserveCards.push(...newCards);
-      // Automatisch 20 in Box 1 schieben, falls leer
-      if (activeCards.filter(c => c.box === 1).length === 0) {
-        const take = Math.min(20, reserveCards.length);
-        const added = reserveCards.splice(0, take).map(c => ({ ...c, box: 1 }));
-        activeCards.push(...added);
-        mode = "lernen";
-        revealed = true;
-      }
-      saveData();
-      updateImportedFilesList();
-      render();
-    } catch {
-      alert("Import fehlgeschlagen.");
-    }
-  };
-  reader.readAsText(file);
-  // Zurücksetzen, damit man dieselbe Datei erneut wählen kann
-  e.target.value = "";
-});
-
-function updateImportedFilesList() {
-  if (!importList) return;
-  const d = currentDeck();
-  importList.innerHTML = "";
-  (d.importedFiles || []).forEach(name => {
-    const li = document.createElement("li");
-    li.textContent = name;
-    importList.appendChild(li);
-  });
+  persist();
+  renderCards();
+  buildBoxChart();
+  drawPieChart();
+  fitAllTilesSoon();
+  updateJudgeBarVisibility();
 }
 
-// Export
-btnExport?.addEventListener("click", () => {
-  const data = { activeCards, reserveCards, learnedCards };
-  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "deck.json";
-  a.click();
-});
+/* -------------------------- Add +7 -------------------------- */
+function addSeven(){
+  const take = Math.min(7, reserveCards.length);
+  const add = reserveCards.splice(0, take).map(c=>({...c, box:1}));
+  activeCards.push(...add);
+  persist();
+  setMode("lernen"); // automatisch in Lernen
+  // Lernindex ans Ende der neuen 7 setzen
+  const b1 = activeCards.filter(c=>c.box===1).length;
+  learnIndex = Math.max(0, b1 - add.length);
+  renderCards();
+  buildBoxChart();
+  drawPieChart();
+  fitAllTilesSoon();
+}
 
-// Korrektur (Prüfen)
-btnRight?.addEventListener("click", () => {
-  if (mode !== "prüfen" || !revealed) return;
-  const bx = activeCards.filter(c => c.box === currentTestBox);
-  if (bx.length === 0) return;
-  const card = bx.find(c => cardTextA(c) === tileEs.textContent);
-  if (!card) return;
-  card.box = Math.min(5, card.box + 1);
-  saveData();
-  revealed = false;
-  render();
-});
+/* -------------------------- Judge Aktionen -------------------------- */
+function judgeRight(){
+  if (state.mode !== "pruefen") return;
+  const bx = activeCards.filter(c=>c.box===state.currentBox);
+  if (!bx.length) return;
+  const card = bx[pruefIndex % bx.length];
+  card.box = Math.min(5, card.box+1);
+  state.revealed = false;
+  pruefIndex++;
+  persist();
+  renderCards();
+  buildBoxChart();
+  drawPieChart();
+}
 
-btnWrong?.addEventListener("click", () => {
-  if (mode !== "prüfen" || !revealed) return;
-  const bx = activeCards.filter(c => c.box === currentTestBox);
-  if (bx.length === 0) return;
-  const card = bx.find(c => cardTextA(c) === tileEs.textContent);
-  if (!card) return;
+function judgeWrong(){
+  if (state.mode !== "pruefen") return;
+  const bx = activeCards.filter(c=>c.box===state.currentBox);
+  if (!bx.length) return;
+  const card = bx[pruefIndex % bx.length];
   card.box = 1;
-  saveData();
-  revealed = false;
-  render();
-});
-
-// Tippen/Swipen auf Karten
-let touchStartX = 0, touchStartY = 0, tracking = false;
-function onTouchStart(ev) {
-  tracking = true;
-  const t = ev.touches?.[0] || ev;
-  touchStartX = t.clientX; touchStartY = t.clientY;
+  state.revealed = false;
+  pruefIndex++;
+  persist();
+  renderCards();
+  buildBoxChart();
+  drawPieChart();
 }
-function onTouchEnd(ev) {
-  if (!tracking) return;
-  tracking = false;
-  const t = ev.changedTouches?.[0] || ev;
-  const dx = t.clientX - touchStartX;
-  const dy = t.clientY - touchStartY;
-  const absX = Math.abs(dx), absY = Math.abs(dy);
-  const TH = 35; // Swipe-Schwelle
-  if (mode === "prüfen" && revealed) {
-    if (absX > absY && absX > TH) {
-      if (dx < 0) { btnWrong?.click(); return; }  // links = falsch
-      if (dx > 0) { btnRight?.click(); return; }  // rechts = richtig
+
+/* -------------------------- Language switching -------------------------- */
+function applyUiLanguage(){
+  // Dropdown
+  if (elLangSelect) elLangSelect.value = state.uiLang;
+  // alle sichtbaren Labels aktualisieren
+  updateTopUI();
+  // ggf. Drawer-Beschriftungen etc. (optional statische Texte)
+  document.querySelectorAll("[data-i18n]").forEach(node=>{
+    const key = node.getAttribute("data-i18n");
+    if (key && I18N[state.uiLang][key]) node.textContent = I18N[state.uiLang][key];
+  });
+}
+
+/* -------------------------- Direction & Labels -------------------------- */
+function saveSideLabels(){
+  const d = currentDeck(); if (!d) return;
+  d.sideALabel = (sideALabelInput?.value || "").trim() || t("a");
+  d.sideBLabel = (sideBLabelInput?.value || "").trim() || t("b");
+  persist();
+  updateTopUI();
+  renderCards();
+}
+
+/* -------------------------- Gestures (kurz) -------------------------- */
+// Tip auf Karte B → im Prüfmodus reveal
+[elTileA, elTileB].forEach(el=>{
+  if (!el) return;
+  el.addEventListener("click", ()=>{
+    if (state.mode === "pruefen" && !state.revealed){
+      revealAnswer();
     }
-  }
-  // sonst: aufdecken (nur prüfen)
-  if (mode === "prüfen" && !revealed) {
-    revealed = true;
-    render();
-  }
-}
-[tileEs, tileDe].forEach(el => {
-  el?.addEventListener("touchstart", onTouchStart, { passive: true });
-  el?.addEventListener("touchend", onTouchEnd, { passive: true });
-  el?.addEventListener("mousedown", onTouchStart);
-  el?.addEventListener("mouseup", onTouchEnd);
+  }, {passive:true});
 });
 
-/* ---------- Init ---------- */
-function init() {
-  // Deckliste füllen
-  refreshDeckSelect();
-
-  // Labels/Placeholder aus aktuellem Deck
-  const d = currentDeck();
-  if (inputSideA) inputSideA.placeholder = d.sideALabel || "A";
-  if (inputSideB) inputSideB.placeholder = d.sideBLabel || "B";
-
-  // Startstatus
-  revealed = (mode === "prüfen") ? false : true;
-
-  // UI auf Sprache
-  if (langSelect) langSelect.value = uiLang;
-  applyI18n();
-
-  // Rendering
-  render();
-
-  // robustes Fitting
-  ensureFitOnStartup();
-  observeTileResize();
-
-  // Import-Liste
-  updateImportedFilesList();
+/* -------------------------- Event-Wiring -------------------------- */
+if (elModeToggle){
+  elModeToggle.addEventListener("click", ()=>{
+    setMode(state.mode==="lernen" ? "pruefen" : "lernen");
+  });
 }
+if (elEditBtn){
+  elEditBtn.addEventListener("click", ()=>{
+    // nur toggeln – Implementierung deines Edit-Panels bleibt
+    document.body.classList.toggle("edit-open");
+  });
+}
+if (elDrawerToggle && elDrawer){
+  elDrawerToggle.addEventListener("click", ()=> elDrawer.classList.add("open"));
+}
+if (elDrawerClose && elDrawer){
+  elDrawerClose.addEventListener("click", ()=> elDrawer.classList.remove("open"));
+}
+if (elDeckSelect){
+  elDeckSelect.addEventListener("change", (e)=> switchDeck(e.target.value));
+}
+if (elLangSelect){
+  elLangSelect.addEventListener("change", (e)=>{
+    state.uiLang = e.target.value || "de";
+    persist();
+    applyUiLanguage();
+    renderCards();
+  });
+}
+if (elImportFile){
+  elImportFile.addEventListener("change", async (e)=>{
+    const f = e.target.files?.[0];
+    if (!f) return;
+    await importJsonFile(f);
+    // zurücksetzen für erneuten Import
+    e.target.value = "";
+  });
+}
+if (saveLabelsBtn){
+  saveLabelsBtn.addEventListener("click", saveSideLabels);
+}
+if (elToggleDirection){
+  elToggleDirection.addEventListener("click", ()=>{
+    direction = (direction==="a2b") ? "b2a" : "a2b";
+    updateTopUI();
+    renderCards();
+  });
+}
+if (elAdd7Btn){
+  elAdd7Btn.addEventListener("click", addSeven);
+}
+if (elBtnRight) elBtnRight.addEventListener("click", judgeRight);
+if (elBtnWrong) elBtnWrong.addEventListener("click", judgeWrong);
+
+/* -------------------------- Resize/Orientation Fixes -------------------------- */
+window.addEventListener("resize", ()=>{
+  updateJudgeBarVisibility();
+  fitAllTilesSoon();
+});
+window.addEventListener("orientationchange", ()=>{
+  // nach Orientationchange einmal sanft neu fitten
+  setTimeout(()=>{
+    updateJudgeBarVisibility();
+    fitAllTilesSoon();
+  }, 120);
+});
+
+/* -------------------------- Init -------------------------- */
+function init(){
+  populateDeckSelect();
+  // falls neue Übung ohne Karten, aber Reserve hat → B1 füllen
+  if (activeCards.filter(c=>c.box===1).length === 0 && reserveCards.length){
+    const take = reserveCards.splice(0, Math.min(20,reserveCards.length))
+                              .map(c=>({...c, box:1}));
+    activeCards.push(...take);
+    persist();
+  }
+
+  // Label-Inputs befüllen (wenn vorhanden)
+  const d = currentDeck();
+  if (sideALabelInput) sideALabelInput.value = d.sideALabel || t("a");
+  if (sideBLabelInput) sideBLabelInput.value = d.sideBLabel || t("b");
+
+  applyUiLanguage();
+  renderCards();
+  buildBoxChart();
+  drawPieChart();
+
+  // **Wichtig**: sofort Text-fit, damit kein "Dreh-Trigger" nötig ist
+  fitAllTilesSoon();
+}
+
 init();
